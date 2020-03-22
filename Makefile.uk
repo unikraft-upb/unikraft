@@ -22,6 +22,11 @@ GOCFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 GOCFLAGS    += -fno-split-stack -Wall -Wextra
 GOCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 
+GDCFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
+GDCFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
+GDCFLAGS    += -fno-split-stack -Wall -Wextra
+GDCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include -I/usr/lib/gcc/x86_64-linux-gnu/8/include/d
+
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
@@ -31,22 +36,27 @@ LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
 CFLAGS-$(CONFIG_OPTIMIZE_NONE)            += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 CXXFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 GOCFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
+GDCFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 CFLAGS-$(CONFIG_OPTIMIZE_PERF)            += -O2
 CXXFLAGS-$(CONFIG_OPTIMIZE_PERF)          += -O2
 GOCFLAGS-$(CONFIG_OPTIMIZE_PERF)          += -O2
+GDCFLAGS-$(CONFIG_OPTIMIZE_PERF)          += -O2
 CFLAGS-$(CONFIG_OPTIMIZE_SIZE)            += -Os
 CXXFLAGS-$(CONFIG_OPTIMIZE_SIZE)          += -Os
 GOCFLAGS-$(CONFIG_OPTIMIZE_SIZE)          += -Os
+GDCFLAGS-$(CONFIG_OPTIMIZE_SIZE)          += -Os
 
 CFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)        += -fdata-sections -ffunction-sections
 CXXFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
 GOCFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
+GDCFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
 LDFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)       += -Wl,--gc-sections
 
 # LTO requires the compiler flags to be handed over also for linking
 CFLAGS-$(CONFIG_OPTIMIZE_LTO)             += -flto
 CXXFLAGS-$(CONFIG_OPTIMIZE_LTO)           += -flto
 GOCFLAGS-$(CONFIG_OPTIMIZE_LTO)           += -flto
+GDCFLAGS-$(CONFIG_OPTIMIZE_LTO)           += -flto
 LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO)         += $(CFLAGS) $(CFLAGS-y)
 LDFLAGS-$(CONFIG_OPTIMIZE_LTO)            += $(CFLAGS) $(CFLAGS-y)
 
@@ -67,6 +77,9 @@ CXXFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
 GOCFLAGS += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
 GOCFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 GOCFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
+GDCFLAGS += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
+GDCFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
+GDCFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
 M4FLAGS  += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
 M4FLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 
@@ -77,5 +90,6 @@ ASFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 CFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 CXXFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 GOFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+GDCFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
