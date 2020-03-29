@@ -6,7 +6,7 @@
 
 COMPFLAGS    += -nostdinc -nostdlib
 COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
+COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer
 COMPFLAGS    += -Wall -Wextra
 
 # TODO: Remove -fms-extensions if not needed for our code (it was moved from Arm64 arch)

@@ -501,11 +501,19 @@ ifneq ("$(origin CROSS_COMPILE)","undefined")
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 endif
 
+# Use 'make COMPILER=clang' to compile with clang
+ifeq ("$(origin COMPILER)", "command line")
+  CONFIG_COMPILER := $(COMPILER)
+endif
+ifndef CONFIG_COMPILER
+  CONFIG_COMPILER = gcc
+endif
+
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk))
 
 # Make variables (CC, etc...)
-LD		:= $(CONFIG_CROSS_COMPILE)gcc
-CC		:= $(CONFIG_CROSS_COMPILE)gcc
+LD		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
+CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
 GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
