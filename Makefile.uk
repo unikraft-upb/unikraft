@@ -6,7 +6,7 @@
 
 COMPFLAGS    += -nostdinc -nostdlib
 COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer
+COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 COMPFLAGS    += -Wall -Wextra
 
 # TODO: Remove -fms-extensions if not needed for our code (it was moved from Arm64 arch)
@@ -55,3 +55,11 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 COMPFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+
+ifeq ($(CONFIG_COMPILER), clang)
+CFLAGS:=$(filter-out -fms-extensions,$(CFLAGS))
+COMPFLAGS:=$(filter-out -fno-tree-sra,$(COMPFLAGS))
+COMPFLAGS:=$(filter-out -nostdinc,$(COMPFLAGS))
+LIBLDFLAGS:=$(filter-out -nostdinc,$(LIBLDFLAGS))
+LDFLAGS:=$(filter-out -nostdinc,$(LDFLAGS))
+endif
