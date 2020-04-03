@@ -52,6 +52,7 @@
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/irq.h>
+#include <uk/plat/mm.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -227,9 +228,12 @@ void ukplat_entry(int argc, char *argv[])
 		 * subsequent region to it
 		 */
 		if (unlikely(!a))
-			a = uk_allocbbuddy_init(md.base, md.len);
+			a = uk_allocbbuddy_init(md.base, md.len / 2);
 		else
-			uk_alloc_addmem(a, md.base, md.len);
+			uk_alloc_addmem(a, md.base, md.len / 2);
+
+        /* XXX: This is a temporary solution, used just for testing purposes */
+        uk_pt_init(PAGE_ALIGN((unsigned long) md.base + md.len / 2), PAGE_ALIGN_DOWN(md.len / 2));
 	}
 	if (unlikely(!a))
 		uk_pr_warn("No suitable memory region for memory allocator. Continue without heap\n");
