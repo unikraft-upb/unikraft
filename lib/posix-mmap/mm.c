@@ -164,3 +164,36 @@ int munmap(void *addr, size_t length)
 
 	return 0;
 }
+
+int mprotect(void *addr, size_t length, int prot)
+{
+	unsigned long start = (unsigned long) addr;
+	unsigned long page_prot, page;
+
+	if (start & (PAGE_SIZE - 1)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!length)
+		return 0;
+
+	if ((prot & PROT_NONE) && (prot != PROT_NONE)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	page_prot = PAGE_PROT_NONE;
+	if (prot & PROT_READ)
+		page_prot |= PAGE_PROT_READ;
+	if (prot & PROT_WRITE)
+		page_prot |= PAGE_PROT_WRITE;
+	if (prot & PROT_EXEC)
+		page_prot |= PAGE_PROT_EXEC;
+
+	length = PAGE_ALIGN(length);
+	for (page = start; page < start + length; page += PAGE_SIZE)
+		uk_page_set_prot(page, page_prot);
+
+	return 0;
+}
