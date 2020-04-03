@@ -218,6 +218,43 @@ int uk_page_unmap(unsigned long vaddr)
 	return 0;
 }
 
+int uk_page_set_prot(unsigned long vaddr, unsigned long new_prot)
+{
+	unsigned long pt, pte;
+	unsigned long new_pte;
+
+	if (!PAGE_ALIGNED(vaddr)) {
+		uk_pr_info("Address must be aligned to page size\n");
+		return -1;
+	}
+
+	pt = ukarch_read_pt_base();
+	pte = uk_pte_read(pt, L4_OFFSET(vaddr), 4);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = uk_pte_read(pt, L3_OFFSET(vaddr), 3);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = uk_pte_read(pt, L2_OFFSET(vaddr), 2);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = uk_pte_read(pt, L1_OFFSET(vaddr), 1);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	new_pte = ukarch_pte_l1e(PTE_REMOVE_FLAGS(pte), new_prot);
+	ukarch_pte_write(pt, L1_OFFSET(vaddr), new_pte, 1);
+	ukarch_flush_tlb_entry(vaddr);
+
+	return 0;
+}
+
 unsigned long uk_virt_to_l1_pte(unsigned long vaddr)
 {
 	unsigned long pt, pt_entry;

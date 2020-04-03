@@ -80,6 +80,8 @@ int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot);
 
 int uk_page_unmap(unsigned long vaddr);
 
+int uk_page_set_prot(unsigned long vaddr, unsigned long new_prot);
+
 unsigned long uk_virt_to_l1_pte(unsigned long vaddr);
 
 int uk_pt_init(unsigned long paddr_start, size_t len);
