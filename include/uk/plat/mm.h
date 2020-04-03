@@ -61,10 +61,24 @@ extern unsigned long allocatable_memory_length;
 #include <uk/asm/mm.h>
 #endif	/* CONFIG_PARAVIRT */
 
+static inline unsigned long uk_pte_read(unsigned long pt, size_t offset,
+		size_t level)
+{
+	UK_ASSERT(level >= 1 && level <= PAGETABLE_LEVELS);
+	UK_ASSERT(PAGE_ALIGNED(pt));
+	UK_ASSERT(offset < pagetable_entries[level - 1]);
+
+	return *((unsigned long *) pt + offset);
+}
+
 static inline unsigned long uk_allocatable_memory_start_addr(void)
 {
 	return allocatable_memory_start_addr;
 }
+
+int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot);
+
+int uk_page_unmap(unsigned long vaddr);
 
 unsigned long uk_virt_to_l1_pte(unsigned long vaddr);
 
