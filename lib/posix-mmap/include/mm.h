@@ -49,4 +49,9 @@
 #define MAP_ANONYMOUS 	0x20
 #define MAP_ANON 	MAP_ANONYMOUS
 
+void *mmap(void *addr, size_t length, int prot, int flags,
+		   int fd, off_t offset);
+
+int munmap(void *addr, size_t length);
+
 #endif  // __POSIX_MMAP__

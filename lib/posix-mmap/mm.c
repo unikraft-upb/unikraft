@@ -32,4 +32,135 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <uk/bitmap.h>
+#include <uk/print.h>
+#include <uk/plat/mm.h>
+
 #include <mm.h>
+
+/*
+ * XXX
+ * This does for now a linear search, starting from |start|, looking for a
+ * memory area with |length| bytes (aligned to page size)
+ */
+static unsigned long get_free_virtual_area(unsigned long start, size_t length)
+{
+	unsigned long page;
+
+	if (length & (PAGE_SIZE - 1))
+		return -1;
+
+	while (start >= uk_allocatable_memory_start_addr()) {
+		for (page = start; page < start + length; page += PAGE_SIZE) {
+			if (PAGE_PRESENT(uk_virt_to_l1_pte(page)))
+				break;
+		}
+
+		if (page == start + length)
+			return start;
+
+		start = page + PAGE_SIZE;
+	}
+
+	return -1;
+}
+
+void *mmap(void *addr, size_t length, int prot, int flags,
+		int fd, off_t offset)
+{
+	unsigned long page_addr = (unsigned long) addr;
+	unsigned long area_to_map, page_prot, page;
+
+	/* We don't currently support mapping files */
+	if (!(flags & MAP_ANONYMOUS)) {
+		errno = ENOTSUP;
+		return MAP_FAILED;
+	}
+
+	if (fd != -1 || offset) {
+		errno = EINVAL;
+		return MAP_FAILED;
+	}
+
+	/* At least one of MAP_SHARED or MAP_PRIVATE has to be specified */
+	if (!(flags & MAP_SHARED) && !(flags & MAP_PRIVATE)) {
+		errno = EINVAL;
+		return MAP_FAILED;
+	}
+
+	if ((prot & PROT_NONE) && (prot != PROT_NONE)) {
+		errno = EINVAL;
+		return MAP_FAILED;
+	}
+
+	if (!length) {
+		errno = EINVAL;
+		return MAP_FAILED;
+	}
+
+	length = PAGE_ALIGN(length);
+	if (!length) {
+		errno = ENOMEM;
+		return MAP_FAILED;
+	}
+
+	if (page_addr == NULL || page_addr < uk_allocatable_memory_start_addr())
+		page_addr = uk_allocatable_memory_start_addr();
+	else
+		page_addr = PAGE_ALIGN(page_addr);
+
+	area_to_map = get_free_virtual_area(page_addr, length);
+	if (area_to_map == -1) {
+		errno = ENOMEM;
+		return MAP_FAILED;
+	}
+
+	page_prot = PAGE_PROT_NONE;
+	if (prot & PROT_READ)
+		page_prot |= PAGE_PROT_READ;
+	if (prot & PROT_WRITE)
+		page_prot |= PAGE_PROT_WRITE;
+	if (prot & PROT_EXEC)
+		page_prot |= PAGE_PROT_EXEC;
+
+	for (page = area_to_map; page < area_to_map + length; page += PAGE_SIZE) {
+		if (uk_page_map(page, -1, PAGE_PROT_READ | PAGE_PROT_WRITE)) {
+			munmap(area_to_map, length);
+			errno = ENOMEM;
+			return MAP_FAILED;
+		}
+	}
+
+
+	/* Only true for MAP_ANONYMOUS */
+	memset((void *) area_to_map, 0, length);
+
+	for (page = area_to_map; page < area_to_map + length; page += PAGE_SIZE)
+		uk_page_set_prot(page, page_prot);
+
+	return (void *) area_to_map;
+}
+
+int munmap(void *addr, size_t length)
+{
+	unsigned long start = (unsigned long) addr;
+	unsigned long page;
+
+	if (start & (PAGE_SIZE - 1)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!length)
+		return 0;
+
+	length = PAGE_ALIGN(length);
+	for (page = start; page < start + length; page += PAGE_SIZE)
+		uk_page_unmap(page);
+
+	return 0;
+}
