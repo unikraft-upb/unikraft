@@ -4,14 +4,16 @@
 #
 ################################################################################
 
-COMPFLAGS    += -nostdinc -nostdlib
+COMPFLAGS    += -nostdlib
+COMPFLAGS-$(call have_gcc) += -nostdinc
 COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
+COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer
+COMPFLAGS-$(call have_gcc) += -fno-tree-sra
 COMPFLAGS    += -Wall -Wextra
 
 # TODO: Remove -fms-extensions if not needed for our code (it was moved from Arm64 arch)
-CFLAGS       += -fms-extensions
-ASFLAGS      += -D__ASSEMBLY__
+CFLAGS-$(call have_gcc)	+= -fms-extensions
+ASFLAGS      			+= -D__ASSEMBLY__
 
 ASINCLUDES   += -I$(CONFIG_UK_BASE)/include
 CINCLUDES    += -I$(CONFIG_UK_BASE)/include
@@ -21,8 +23,10 @@ GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
-LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none
-LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
+LIBLDFLAGS 			+= -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none
+LIBLDFLAGS-$(call have_gcc) 	+= -nostdinc
+LDFLAGS     			+= -nostdlib -Wl,--omagic -Wl,--build-id=none
+LDFLAGS-$(call have_gcc) 	+= -nostdinc
 
 COMPFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 COMPFLAGS-$(CONFIG_OPTIMIZE_SIZE)         += -Os
@@ -55,11 +59,3 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 COMPFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
-
-ifeq ($(CONFIG_COMPILER), clang)
-CFLAGS:=$(filter-out -fms-extensions,$(CFLAGS))
-COMPFLAGS:=$(filter-out -fno-tree-sra,$(COMPFLAGS))
-COMPFLAGS:=$(filter-out -nostdinc,$(COMPFLAGS))
-LIBLDFLAGS:=$(filter-out -nostdinc,$(LIBLDFLAGS))
-LDFLAGS:=$(filter-out -nostdinc,$(LDFLAGS))
-endif

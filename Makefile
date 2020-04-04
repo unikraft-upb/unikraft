@@ -506,7 +506,7 @@ ifeq ("$(origin COMPILER)", "command line")
   CONFIG_COMPILER := $(COMPILER)
 endif
 ifndef CONFIG_COMPILER
-  CONFIG_COMPILER = gcc
+  CONFIG_COMPILER := gcc
 endif
 
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk))

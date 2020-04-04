@@ -1,7 +1,9 @@
-ARCHFLAGS     += -D__X86_64__
-ARCHFLAGS     += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
-ISR_ARCHFLAGS += -D__X86_64__
-ISR_ARCHFLAGS += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
+ARCHFLAGS     					+= -D__X86_64__
+ARCHFLAGS     					+= -m64 -mno-red-zone -fno-asynchronous-unwind-tables
+ARCHFLAGS-$(call have_gcc) 			+= -fno-reorder-blocks
+ISR_ARCHFLAGS 					+= -D__X86_64__
+ISR_ARCHFLAGS 					+= -m64 -mno-red-zone -fno-asynchronous-unwind-tables
+ISR_ARCHFLAGS-$(call have_gcc)			+= -fno-reorder-blocks
 
 CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
@@ -9,7 +11,8 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 
 # compiler flags to prevent use of extended (FP, SSE, AVX) registers.
 # This is for files that contain trap/exception/interrupt handlers
-ISR_ARCHFLAGS += -mno-80387 -mno-fp-ret-in-387 -mno-mmx -mno-sse -mno-avx -mgeneral-regs-only
+ISR_ARCHFLAGS 					+= -mno-80387 -mno-mmx -mno-sse -mno-avx -mgeneral-regs-only
+ISR_ARCHFLAGS-$(call have_gcc) 		+= -mno-fp-ret-in-387
 
 ARCHFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)        += -mtune=generic
 ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)    += -mtune=generic
@@ -41,10 +44,3 @@ ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)         += -march=btver1
 ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)     += -march=btver1
 ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)         += -march=btver2
 ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)     += -march=btver2
-
-
-ifeq ($(CONFIG_COMPILER), clang)
-ARCHFLAGS:=$(filter-out -fno-reorder-blocks,$(ARCHFLAGS))
-ISR_ARCHFLAGS:=$(filter-out -fno-reorder-blocks,$(ISR_ARCHFLAGS))
-ISR_ARCHFLAGS:=$(filter-out -mno-fp-ret-in-387,$(ISR_ARCHFLAGS))
-endif

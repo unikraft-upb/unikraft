@@ -29,10 +29,20 @@ lc = $(subst A,a,$(subst B,b,$(subst C,c,$(subst D,d,$(subst E,e,$(subst F,f,$(s
 # upper case
 uc = $(subst a,A,$(subst b,B,$(subst c,C,$(subst d,D,$(subst e,E,$(subst f,F,$(subst g,G,$(subst h,H,$(subst i,I,$(subst j,J,$(subst k,K,$(subst l,L,$(subst m,M,$(subst n,N,$(subst o,O,$(subst p,P,$(subst q,Q,$(subst r,R,$(subst s,S,$(subst t,T,$(subst u,U,$(subst v,V,$(subst w,W,$(subst x,X,$(subst y,Y,$(subst z,Z,$(1)))))))))))))))))))))))))))
 
+# test if GCC is set as a compiler
+define have_gcc =
+$(shell if [ $(CC) = gcc ] ; then echo y ; else echo n ; fi)
+endef
+
+# test if CLANG is set as a compiler
+define have_clang =
+$(shell if [ $(CC) == clang ] ; then echo y ; else echo n ; fi)
+endef
+
 # test whether GCC version is greater than or equal to the minimum requirement
 # gcc_version_ge $gcc_major,$gcc_minor
 define gcc_version_ge =
-$(shell if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo y ; fi)
+$(shell if [ $(call have_gcc) = y ] ; then if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo y ; fi ; else echo n ; fi)
 endef
 
 # print error and stop build when GCC version doesn't meet the minimum requirement
@@ -40,6 +50,19 @@ endef
 define error_if_gcc_version_lt =
 $(if $(call gcc_version_ge,$(1),$(2)),,\
      $(error Require GCC version >= $(1).$(2) found $(CC_VER_MAJOR).$(CC_VER_MINOR)))
+endef
+
+# test whether CLANG  version is greater than or equal to the minimum requirement
+# clang_version_ge $clang_major, $clang_minor
+define clang_version_ge =
+$(shell if [ $(call have_clang) = y ] ; then if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo y ; fi ; else echo n ; fi)
+endef
+
+# print error and stop build when CLANG version doesn't meet the minimum requirement
+# error_if_clang_version_lt $clang_major,$clang_minor.
+define error_if_clang_version_lt =
+$(if $(call clang_version_ge,$(1),$(2)),,\
+     $(error Require CLANG version >= $(1).$(2) found $(CC_VER_MAJOR).$(CC_VER_MINOR)))
 endef
 
 ################################################################################
