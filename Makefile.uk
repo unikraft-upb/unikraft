@@ -25,7 +25,7 @@ GOCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 GDCFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
 GDCFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 GDCFLAGS    += -fno-split-stack -Wall -Wextra
-GDCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include -I/usr/lib/gcc/x86_64-linux-gnu/8/include/d
+GDCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
