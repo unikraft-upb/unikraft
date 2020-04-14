@@ -234,3 +234,12 @@ nofsgsbase:
 	cli
 	hlt
 END(_libkvmplat_start64)
+
+.text
+ENTRY(_libkvmplat_entry)
+	push %rbp
+	mov  %rsp,%rbp
+
+	leaveq
+	retq
+END(_libkvmplat_entry)
