@@ -22,10 +22,11 @@ final_link:
 	-Wl,-T,ukdebug/extra.ld -Wl,-T,vfscore/extra.ld  static_kernel.o -o static_kernel.dbg
 
 run:
-	sudo qemu-system-x86_64 -enable-kvm -nographic -device isa-debug-exit -kernel $(exec)
+	sudo qemu-system-x86_64 -enable-kvm -nographic -device isa-debug-exit -kernel $(exec) | true
 
 run_gdb:
-	sudo qemu-system-x86_64 -s -S -cpu host -enable-kvm -m 128 -nodefaults -no-acpi -display none -serial stdio -device isa-debug-exit -kernel $(exec) -append verbose
+	sudo qemu-system-x86_64 -s -S -cpu host -enable-kvm -m 128 -nodefaults -no-acpi -display none \
+	-serial stdio -device isa-debug-exit -kernel $(exec) -append verbose | true
 
 clean:
 	rm -rf .entry64.o.d entry64.o entry1 entry2 entry3 entry4 link64.lds .link64.lds.d \
