@@ -1,0 +1,7 @@
+all: compile link
+
+compile:
+	as --64 -o myinitrd.o asm_initrd.S
+
+link:
+	ld --oformat binary -o myinitrd.bin myinitrd.o

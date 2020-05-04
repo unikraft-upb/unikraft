@@ -276,7 +276,20 @@ void _libkvmplat_entry(void *arg)
 	_mb_init_initrd(mi);
 
 	uk_pr_info("We have initrd at address: %p with %d length\n", _libkvmplat_cfg.initrd.start, _libkvmplat_cfg.initrd.len);
-	uk_pr_info("Initrd: %s\n", _libkvmplat_cfg.initrd.start);
+
+	/* print contents of initrd */
+	unsigned char *ptr = 0x117000;
+	int i;
+    for (i=0; i<80; i++) {
+        uk_pr_info("%02hhX ", ptr[i]);
+	}
+	uk_pr_info("\n");
+
+	void (*foo)(void) = (void (*)())0x117000;
+	uk_pr_info("Jumping to initrd\n");
+	foo();
+	//goto *ptr;
+	uk_pr_info("Return from initrd\n");
 
 	ukplat_terminate(UKPLAT_HALT);
 }
