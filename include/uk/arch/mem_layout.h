@@ -32,60 +32,33 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __UKPLAT_MM__
-#define __UKPLAT_MM__
+#ifndef __UKARCH_MEM_LAYOUT__
+#define __UKARCH_MEM_LAYOUT__
 
-#define PAGE_PROT_NONE	0x0
-#define PAGE_PROT_READ	0x1
-#define PAGE_PROT_WRITE 0x2
-#define PAGE_PROT_EXEC	0x4
+#include <uk/plat/common/sections.h>
 
-#define PAGE_INVALID	((unsigned long) -1)
-#define PAGE_NOT_MAPPED 0
+#define PAGE_SIZE_2MB 0x200000UL
 
-extern unsigned long phys_bitmap_start_addr;
-extern unsigned long phys_bitmap_length;
+/* This has to be broken down further and maybe placed somewhere else in memory */
+/* Here are the regions: Code + Data + BSS + Rodata etc. */
+#define KERNEL_AREA_START 	0x0UL
+#define KERNEL_AREA_END		((__END + PAGE_SIZE_2MB) & (~(PAGE_SIZE_2MB - 1)))
+#define KERNEL_AREA_SIZE 	(KERNEL_AREA_END - KERNEL_AREA_START)
 
-extern unsigned long bitmap_start_addr;
-extern unsigned long bitmap_length;
+#define PAGETABLES_AREA_START	KERNEL_AREA_END
+#define PAGETABLES_AREA_END	(KERNEL_AREA_END + 0x4000000) /* 64MB size */
+#define PAGETABLES_AREA_SIZE	(PAGETABLES_AREA_END - PAGETABLES_AREA_START)
 
-extern unsigned long internal_pt_start_addr;
-extern unsigned long internal_pt_length;
+/* Stack is present at the end of the 128TB area */
+#define STACK_AREA_END 		0x800000000000
+#define STACK_AREA_START 	(STACK_AREA_END - __STACK_SIZE)
+#define STACK_AREA_SIZE 	__STACK_SIZE
 
-extern unsigned long allocatable_memory_start_addr;
-extern unsigned long allocatable_memory_length;
+/* Heap is the rest of the memory */
+/* Maybe this should be broken down as well between heap and mmap area */
+#define HEAP_AREA_START		PAGETABLES_AREA_END
+#define HEAP_AREA_END		STACK_AREA_START
+#define HEAP_AREA_SIZE		(HEAP_AREA_END - HEAP_AREA_START)
 
-#ifdef CONFIG_PARAVIRT
-#include <uk/asm/mm_pv.h>
-#else
-#include <uk/asm/mm.h>
-#endif	/* CONFIG_PARAVIRT */
-
-static inline unsigned long uk_pte_read(unsigned long pt, size_t offset,
-		size_t level)
-{
-	UK_ASSERT(level >= 1 && level <= PAGETABLE_LEVELS);
-	UK_ASSERT(PAGE_ALIGNED(pt));
-	UK_ASSERT(offset < pagetable_entries[level - 1]);
-
-	return *((unsigned long *) pt + offset);
-}
-
-static inline unsigned long uk_allocatable_memory_start_addr(void)
-{
-	return 0x40000000;
-	//return allocatable_memory_start_addr;
-}
-
-int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot);
-
-int uk_page_unmap(unsigned long vaddr);
-
-int uk_page_set_prot(unsigned long vaddr, unsigned long new_prot);
-
-unsigned long uk_virt_to_l1_pte(unsigned long vaddr);
-
-int uk_pt_init(unsigned long paddr_start, size_t len);
-
-#endif /* __UKPLAT_MM__ */
+#endif /* __UKARCH_MEM_LAYOUT__ */
 

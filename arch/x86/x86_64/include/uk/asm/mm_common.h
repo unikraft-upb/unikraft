@@ -41,6 +41,7 @@
 #include <uk/bitmap.h>
 
 #define PAGE_SIZE		0x1000UL
+#define PAGE_SIZE_2MB		0x200000UL
 #define PAGE_SHIFT		12
 #define PAGE_MASK		(~(PAGE_SIZE - 1))
 #define PAGETABLE_LEVELS	4
@@ -163,7 +164,7 @@ static inline unsigned long ukarch_phys_frame_get(void)
 	pfn = (allocatable_memory_start_addr >> PAGE_SHIFT) + offset;
 
 	if (offset * PAGE_SIZE > allocatable_memory_length) {
-		uk_pr_err("Out of memory\n");
+		uk_pr_err("Out of physical memory (did not find a new physical frame)\n");
 		return PAGE_INVALID;
 	}
 

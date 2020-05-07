@@ -135,7 +135,6 @@ void *mmap(void *addr, size_t length, int prot, int flags,
 		}
 	}
 
-
 	/* Only true for MAP_ANONYMOUS */
 	memset((void *) area_to_map, 0, length);
 

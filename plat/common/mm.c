@@ -40,6 +40,10 @@
 #include <uk/print.h>
 #include <uk/plat/mm.h>
 
+#include <kvm/config.h>
+
+#include <uk/arch/mem_layout.h>
+
 unsigned long phys_bitmap_start_addr;
 unsigned long phys_bitmap_length;
 
@@ -291,8 +295,10 @@ unsigned long uk_virt_to_l1_pte(unsigned long vaddr)
 	return pt_entry;
 }
 
+#if 0
 int uk_pt_init(unsigned long paddr_start, size_t len)
 {
+	uk_pr_err("INIT CALLED\n");
 	/*
 	 * The needed bookkeeping internal structures are:
 	 * - a physical address bitmap, to keep track of all available physical
@@ -359,4 +365,123 @@ int uk_pt_init(unsigned long paddr_start, size_t len)
 			- paddr_start - len;
 
 	return 0;
+}
+#endif
+
+int uk_pt_init(unsigned long paddr_start, size_t len)
+{
+}
+
+void uk_pt_build(struct kvmplat_config c, unsigned long max_paddr)
+{
+	/* create 1:1 large page map for the kernel */
+	unsigned long kernel_pages = DIV_ROUND_UP(KERNEL_AREA_SIZE, PAGE_SIZE_2MB);
+	unsigned long pagetable_pages = DIV_ROUND_UP(PAGETABLES_AREA_SIZE, PAGE_SIZE_2MB);
+	size_t i;
+
+	unsigned long pt_l4, pt_l3, pt_l2;
+
+	pt_l4 = PAGETABLES_AREA_START;
+	pt_l3 = PAGETABLES_AREA_START + PAGE_SIZE;
+	pt_l2 = PAGETABLES_AREA_START + 2 * PAGE_SIZE;
+
+	*((unsigned long *) pt_l4) = pt_l3 | L4_PROT;
+	*((unsigned long *) pt_l3) = pt_l2 | L3_PROT;
+
+	uk_pr_err("MAX PADDR %lu\n", max_paddr);
+
+	for (i = 0; i < kernel_pages; i++)
+		*((unsigned long *) pt_l2 + i) = (i * PAGE_SIZE_2MB) | L2_PROT | _PAGE_PSE;
+
+	/* Now that kernel is mapped, map the pagetables area in large pages */
+	for (i = 0; i < pagetable_pages; i++) {
+		/* These are now mapped 1:1, maybe change this */
+		unsigned long current_page = PAGETABLES_AREA_START + i * PAGE_SIZE_2MB;
+		*((unsigned long *) pt_l2 + L2_OFFSET(current_page)) = current_page | L2_PROT | _PAGE_PSE;
+	}
+
+	/* We switch to the new pagetable */
+	__asm__ __volatile__("movq %0, %%cr3" :: "r"(pt_l4):);
+
+	/*
+	 * Now we need to initialize the mapping mechanism to map the new stack and switch to it
+	 */
+	unsigned long paddr_start = __END;
+	unsigned long len = max_paddr - __END;
+	UK_ASSERT(PAGE_ALIGNED(paddr_start));
+	UK_ASSERT(PAGE_ALIGNED(len));
+	uk_pr_err("INIT CALLED\n");
+	/*
+	 * The needed bookkeeping internal structures are:
+	 * - a physical address bitmap, to keep track of all available physical
+	 *   addresses (which will have a bit for every frame, so the size
+	 *   allocatable_memory_length / PAGE_SIZE)
+	 * - a memory area where page tables are stored
+	 * - a bitmap for pages used as page tables
+	 */
+
+	/*
+	 * |allocatable_memory_length| is the length of the remaining memory,
+	 * after allocating the necessary bitmaps.
+	 */
+	allocatable_memory_length = len - PAGETABLES_AREA_SIZE;
+	allocatable_memory_length = PAGE_ALIGN_DOWN(allocatable_memory_length);
+	uk_pr_err("ALLOCATABLE MEM LENGTH IS %lu\n", allocatable_memory_length);
+	uk_pr_err("End of memory is at address 0x%016lx\n", max_paddr);
+
+	/*
+	 * Need to bookkeep |allocatable_memory_length| bytes of physical
+	 * memory, starting from |allocatable_memory_start_addr|. This is the
+	 * physical memory given by the hypervisor.
+	 *
+	 * In Xen's case, the bitmap keeps the pseudo-physical addresses, the
+	 * translation to machine frames being done later.
+	 */
+	phys_bitmap_start_addr = PAGETABLES_AREA_START + 3 * PAGE_SIZE;
+	phys_bitmap_length = allocatable_memory_length >> PAGE_SHIFT;
+	uk_bitmap_zero((unsigned long *) phys_bitmap_start_addr,
+			phys_bitmap_length);
+
+	uk_pr_err("Phys bitmap goes from 0x%016lx to 0x%016lx\n", phys_bitmap_start_addr, phys_bitmap_start_addr + phys_bitmap_length);
+
+	internal_pt_start_addr =
+		PAGE_ALIGN(phys_bitmap_start_addr + phys_bitmap_length);
+	internal_pt_length = PAGE_ALIGN_DOWN((unsigned long)
+			((PAGETABLES_AREA_SIZE - phys_bitmap_length - 3 * PAGE_SIZE) * PAGE_SIZE / (PAGE_SIZE + 1)));
+	memset((void *) internal_pt_start_addr, 0, internal_pt_length);
+
+	uk_pr_err("Internal PT goes from 0x%016lx to 0x%016lx\n", internal_pt_start_addr, internal_pt_start_addr + internal_pt_length);
+
+	/* Bookkeeping free pages used for PT allocations */
+	bitmap_start_addr =
+		PAGE_ALIGN(internal_pt_start_addr + internal_pt_length);
+	bitmap_length = internal_pt_length >> PAGE_SHIFT;
+	uk_bitmap_zero((unsigned long *) bitmap_start_addr, bitmap_length);
+
+	uk_pr_err("Bitmap goes from 0x%016lx to 0x%016lx\n", bitmap_start_addr, bitmap_start_addr + bitmap_length);
+
+	/* The remaining memory is the actual usable memory */
+	allocatable_memory_start_addr =
+	    PAGE_ALIGN(bitmap_start_addr + bitmap_length);
+
+	if (allocatable_memory_start_addr + allocatable_memory_length > paddr_start + len)
+		allocatable_memory_length -=
+			allocatable_memory_start_addr
+			+ allocatable_memory_length
+			- paddr_start - len;
+
+	/* Map stack in regular pages */
+	unsigned long stack_pages = STACK_AREA_SIZE / PAGE_SIZE;
+	for (i = 0; i < stack_pages; i++)
+		uk_page_map(STACK_AREA_START + i * PAGE_SIZE, -1, PAGE_PROT_READ | PAGE_PROT_WRITE);
+
+	/* Map heap in regular pages */
+	unsigned long heap_pages = c.heap.len >> PAGE_SHIFT;
+	if (heap_pages > (allocatable_memory_length >> PAGE_SHIFT))
+		heap_pages = allocatable_memory_length >> PAGE_SHIFT;
+	uk_pr_err("NEED %lu pages for heap\n", heap_pages);
+	uk_pr_err("Heap goes from 0x%016lx to 0x%016lx\n", c.heap.start, c.heap.start + heap_pages * PAGE_SIZE);
+	for (i = 0; i < heap_pages; i++)
+		if (uk_page_map(c.heap.start + i * PAGE_SIZE, -1, PAGE_PROT_READ | PAGE_PROT_WRITE))
+			uk_pr_err("FAILED TO MAP 0x%016lx\n", c.heap.start + i * PAGE_SIZE);
 }

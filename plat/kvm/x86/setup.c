@@ -41,6 +41,8 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 
+#include <uk/arch/mem_layout.h>
+
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
 
@@ -91,13 +93,8 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	}
 	UK_ASSERT(offset < mi->mmap_length);
 
-	/*
-	 * Cap our memory size to PLATFORM_MAX_MEM_SIZE which boot.S defines
-	 * page tables for.
-	 */
 	max_addr = m->addr + m->len;
-	if (max_addr > PLATFORM_MAX_MEM_ADDR)
-		max_addr = PLATFORM_MAX_MEM_ADDR;
+	uk_pr_err("m->addr is 0x%016lx and m->len is 0x%016lx\n", m->addr, m->len);
 	UK_ASSERT((size_t) __END <= max_addr);
 
 	/*
@@ -106,6 +103,7 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	if ((max_addr - m->addr) < __STACK_SIZE)
 		UK_CRASH("Not enough memory to allocate boot stack\n");
 
+	/*
 	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t) __END, __PAGE_SIZE);
 	_libkvmplat_cfg.heap.end   = (uintptr_t) max_addr - __STACK_SIZE;
 	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
@@ -113,6 +111,18 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
 	_libkvmplat_cfg.bstack.end   = max_addr;
 	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
+	*/
+
+	_libkvmplat_cfg.heap.start = HEAP_AREA_START;
+	_libkvmplat_cfg.heap.end   = (uintptr_t) max_addr - __STACK_SIZE;
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
+				     - _libkvmplat_cfg.heap.start;
+	_libkvmplat_cfg.bstack.start = STACK_AREA_START;
+	_libkvmplat_cfg.bstack.end   = STACK_AREA_END;
+	_libkvmplat_cfg.bstack.len   = STACK_AREA_SIZE;
+
+	// XXX(steodorescu)
+	uk_pt_build(_libkvmplat_cfg, max_addr);
 }
 
 static inline void _mb_init_initrd(struct multiboot_info *mi)

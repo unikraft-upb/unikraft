@@ -41,7 +41,13 @@
 #include <stdio.h>
 #include <errno.h>
 
-#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
+#if CONFIG_LIBUKALLOC && CONFIG_LIBTINYALLOC && CONFIG_LIBUKBOOT_INITALLOC
+#include <uk/tinyalloc.h>
+#elif CONFIG_LIBUKALLOC && CONFIG_LIBTLSF && CONFIG_LIBUKBOOT_INITALLOC
+#include <uk/tlsf.h>
+#elif CONFIG_LIBUKALLOC && CONFIG_LIBMIMALLOC && CONFIG_LIBUKBOOT_INITALLOC
+#include <uk/mimalloc.h>
+#elif CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
 #include <uk/allocbbuddy.h>
 #endif
 #if CONFIG_LIBUKSCHED
@@ -206,7 +212,7 @@ void ukplat_entry(int argc, char *argv[])
 	}
 #endif /* CONFIG_LIBUKLIBPARAM */
 
-#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
+#if CONFIG_LIBUKALLOC && (CONFIG_LIBUKALLOCBBUDDY || CONFIG_LIBTINYALLOC || CONFIG_LIBTLSF || CONFIG_LIBMIMALLOC) && CONFIG_LIBUKBOOT_INITALLOC
 	/* initialize memory allocator
 	 * FIXME: ukallocbbuddy is hard-coded for now
 	 */
@@ -227,12 +233,27 @@ void ukplat_entry(int argc, char *argv[])
 		 * As soon we have an allocator, we simply add every
 		 * subsequent region to it
 		 */
+#if CONFIG_LIBTINYALLOC || CONFIG_LIBTLSF || CONFIG_LIBMIMALLOC
+		if (unlikely(!a) && md.len > __PAGE_SIZE)
+#else
 		if (unlikely(!a))
+#endif
+#if CONFIG_LIBTINYALLOC
+			a = uk_tinyalloc_init(md.base, md.len);
+#elif CONFIG_LIBTLSF
+			a = uk_tlsf_init(md.base, md.len);
+#elif CONFIG_LIBMIMALLOC
+			a = uk_mimalloc_init(md.base, md.len / 2);
+#else
 			a = uk_allocbbuddy_init(md.base, md.len / 2);
+#endif
+#if !(CONFIG_LIBTINYALLOC || CONFIG_LIBTLSF || CONFIG_LIBMIMALLOC)
 		else
 			uk_alloc_addmem(a, md.base, md.len / 2);
+#endif
 
         /* XXX: This is a temporary solution, used just for testing purposes */
+	uk_pr_err("START MEMORY IS 0x%016lx with length 0x%016lx\n", md.base, md.len);
         uk_pt_init(PAGE_ALIGN((unsigned long) md.base + md.len / 2), PAGE_ALIGN_DOWN(md.len / 2));
 	}
 	if (unlikely(!a))
