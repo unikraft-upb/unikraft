@@ -1,15 +1,18 @@
-all: entry64 cpu_features print nolib setup shutdown cpu_native\
+INCLUDES = -I./include -Iplat/kvm/include/kvm -Inolibc/include -Ilibelf/include -I./plat/kvm/include
+
+
+all: entry64 cpu_features print nolib libelfa setup shutdown cpu_native\
 	 alloc console serial_console vga_console link_script final_link
 
 entry64:
-	gcc -I./include -DCC_VERSION=7.5 -D__X86_64__ -m64 -U __linux__ -U __FreeBSD__ \
+	gcc $(INCLUDES) -DCC_VERSION=7.5 -D__X86_64__ -m64 -U __linux__ -U __FreeBSD__ \
 	-U __sun__ -D__ASSEMBLY__ -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 \
 	-DUK_FULLVERSION=0.4.0~00bbf2c -mtune=generic -no-pie -g3 -DKVMPLAT -D__LIBNAME__=libkvmplat \
 	-D__BASENAME__=entry64.S -c entry64.S -o entry64.o -Wp,-MD,.entry64.o.d
 
 cpu_features:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector -fno-omit-frame-pointer \
-	-I./include -I./nolibc/include -I./plat/kvm/include \
+	$(INCLUDES) \
 	-fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~0453b2e \
 	-O0 -fno-optimize-sibling-calls -fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks \
 	-fno-asynchronous-unwind-tables  -mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf \
@@ -20,7 +23,7 @@ cpu_features:
 	-o cpu_features.common.o -Wp,-MD,.cpu_features.common.o.d
 
 link_script:
-	gcc  -E -P -x assembler-with-cpp  -I./include  -DCC_VERSION=7.5 -D__X86_64__ -m64 -U __linux__ \
+	gcc  -E -P -x assembler-with-cpp  $(INCLUDES)  -DCC_VERSION=7.5 -D__X86_64__ -m64 -U __linux__ \
 	-U __FreeBSD__ -U __sun__ -D__ASSEMBLY__ -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 \
 	-DUK_FULLVERSION=0.4.0~71946ac  -mtune=generic -no-pie -DKVMPLAT link64.lds.S -o link64.lds \
 	-Wp,-MD,.link64.lds.d
@@ -28,13 +31,13 @@ link_script:
 final_link:
 	gcc -r -nostdinc -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie  -Wl,-m,elf_x86_64 \
 	entry64.o setup.o cpu_features.common.o print.o console.o serial_console.o vga_console.o shutdown.o \
-	cpu_native.o alloc.o build/libnolibc.o -Wl,--start-group     -Wl,--end-group -o static_kernel.ld.o
+	cpu_native.o alloc.o build/libnolibc.o build/libelf.o -Wl,--start-group     -Wl,--end-group -o static_kernel.ld.o
 	objcopy -w -G kvmos_* -G _libkvmplat_entry static_kernel.ld.o static_kernel.o
 	gcc  -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none  -no-pie  -Wl,-m,elf_x86_64 -Wl,-dT,link64.lds \
 	-Wl,-T,ukdebug/extra.ld -Wl,-T,vfscore/extra.ld  static_kernel.o -o static_kernel.dbg
 
 setup:
-	gcc -I./include -I./nolibc/include -I./plat/kvm/include -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector -fno-omit-frame-pointer \
+	gcc $(INCLUDES) -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector -fno-omit-frame-pointer \
 	-fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7 \
 	-O0 -fno-optimize-sibling-calls -fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks \
 	-fno-asynchronous-unwind-tables  -mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf \
@@ -47,7 +50,7 @@ print:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -59,7 +62,7 @@ console:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -71,7 +74,7 @@ serial_console:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -83,7 +86,7 @@ vga_console:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -95,7 +98,7 @@ shutdown:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -107,7 +110,7 @@ cpu_native:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -119,7 +122,7 @@ alloc:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -131,7 +134,7 @@ time:
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
 	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie -I./include -I./nolibc/include -I./plat/kvm/include \
+	-fno-tree-vectorize -no-pie $(INCLUDES) \
 	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
 	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
 	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
@@ -142,6 +145,9 @@ time:
 nolib:
 	make -f Makefile_nolibc
 
+libelfa:
+	make -f Makefile_libelf
+
 run:
 	sudo qemu-system-x86_64 -enable-kvm -nographic -device isa-debug-exit -kernel $(exec)
 run_gdb:
@@ -151,3 +157,4 @@ run_gdb:
 clean:
 	rm -rf *.o .*.o.d link64.lds .link64.lds.d static_kernel.*
 	make clean -f Makefile_nolibc
+	make clean -f Makefile_libelf

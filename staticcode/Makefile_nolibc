@@ -1,12 +1,13 @@
 NOLIBCDIR = nolibc
 SRCS = $(wildcard $(NOLIBCDIR)/*.c)
 CMDS = $(patsubst $(NOLIBCDIR)/%.c,$(NOLIBCDIR)/%.o,$(SRCS))
+INCLUDES = -I./include -Iplat/kvm/include/kvm -Inolibc/include -Ilibelf/include -I./plat/kvm/include
 
 all: $(CMDS) link obj_copy
 
 $(NOLIBCDIR)/%.o: $(NOLIBCDIR)/%.c
 	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__  \
-	-I./include -Iplat/kvm/include/kvm -Inolibc/include \
+	$(INCLUDES) \
 	-fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra \
 	-D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~0453b2e \
 	-O0 -fno-optimize-sibling-calls -fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone \
@@ -29,4 +30,4 @@ obj_copy:
 	objcopy --keep-global-symbols=nolibc/exportsyms.uk -w -L __* build/libnolibc.ld.o build/libnolibc.o
 
 clean:
-	rm -rf build/libnolibc/* build/libnolibc.ld.o build/libnolibc.o
+	rm -rf build/libnolibc/* build/libnolibc/.*.o.d build/libnolibc.ld.o build/libnolibc.o

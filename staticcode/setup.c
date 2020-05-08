@@ -47,6 +47,8 @@
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
 
+#include <libelf.h>
+
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
 
@@ -278,16 +280,19 @@ void _libkvmplat_entry(void *arg)
 	uk_pr_info("We have initrd at address: %p with %d length\n", _libkvmplat_cfg.initrd.start, _libkvmplat_cfg.initrd.len);
 
 	/* print contents of initrd */
-	unsigned char *ptr = 0x117000;
-	int i;
-    for (i=0; i<80; i++) {
-        uk_pr_info("%02hhX ", ptr[i]);
-	}
-	uk_pr_info("\n");
+	// unsigned char *ptr = 0x117000;
+	// int i;
+    // for (i=0; i<80; i++) {
+    //     uk_pr_info("%02hhX ", ptr[i]);
+	// }
+	// uk_pr_info("\n");
 
-	void (*foo)(void) = (void (*)())0x117000;
+	Elf64_Ehdr *ehdr = (Elf64_Ehdr *) _libkvmplat_cfg.initrd.start;
+	uk_pr_info("Entry Address: 0x%lx\n", ehdr->e_entry);
+
+	//void (*foo)(void) = (void (*)())0x117000;
 	uk_pr_info("Jumping to initrd\n");
-	foo();
+	//foo();
 	//goto *ptr;
 	uk_pr_info("Return from initrd\n");
 
