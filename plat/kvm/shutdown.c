@@ -27,11 +27,38 @@
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
 
+#if CONFIG_OPTIMIZE_PGO_GENERATE
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#define GCOV_GENERATE_FILE	"/home/alice/Documents/Diploma/Comp-opt/apps/helloworld/build/apphelloworld/main.gcda"
+
+void create_hierarchy()
+{
+	mkdir("/home", 0777);
+	mkdir("/home/alice", 0777);
+	mkdir("/home/alice/Documents", 0777);
+	mkdir("/home/alice/Documents/Diploma", 0777);
+	mkdir("/home/alice/Documents/Diploma/Comp-opt", 0777);
+	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps", 0777);
+	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps/helloworld", 0777);
+	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps/helloworld/build", 0777);
+	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps/helloworld/build/apphelloworld", 0777);
+}
+
+#endif
+
 static void cpu_halt(void) __noreturn;
 
 /* TODO: implement CPU reset */
 void ukplat_terminate(enum ukplat_gstate request __unused)
 {
+
+#if CONFIG_OPTIMIZE_PGO_GENERATE
+	create_hierarchy();
+	__gcov_exit();
+#endif
+
 	uk_pr_info("Unikraft halted\n");
 
 	/* Try to make system off */

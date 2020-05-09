@@ -36,9 +36,11 @@ COMPFLAGS-$(CONFIG_OPTIMIZE_LTO)          += -flto
 LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO)         += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y)
 LDFLAGS-$(CONFIG_OPTIMIZE_LTO)            += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y)
 
-# PGO
-COMPFLAGS-$(CONFIG_OPTIMIZE_PGO_GENERATE)          += -fprofile-generate
+# PGO - profile-generate phase
 LDFLAGS-$(CONFIG_OPTIMIZE_PGO_GENERATE)            += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y) -fprofile-generate
+
+# PGO - profile-use phase
+LDFLAGS-$(CONFIG_OPTIMIZE_PGO_USE)            += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y) -O3 -fprofile-use=main.gcda
 
 # ASAN
 COMPFLAGS-$(CONFIG_OPTIMIZE_ASAN)          += -fsanitize=address
