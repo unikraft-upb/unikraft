@@ -48,6 +48,10 @@
 #include <uk/plat/bootstrap.h>
 
 #include <libelf.h>
+#include <binfmt_elf.h>
+#include <uk/essentials.h>
+#include <uk/plat/memory.h>
+#include <uk/allocbbuddy.h>
 
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
@@ -259,9 +263,49 @@ no_initrd:
 	return;
 }
 
+static inline void initialize_allocator()
+{
+	struct ukplat_memregion_desc md;
+	int rc __maybe_unused = 0;
+	struct uk_alloc *a = NULL;
+
+	uk_pr_info("Initialize memory allocator...\n");
+
+	ukplat_memregion_foreach(&md, UKPLAT_MEMRF_ALLOCATABLE) {
+#if CONFIG_UKPLAT_MEMRNAME
+		uk_pr_debug("Try memory region: %p - %p (flags: 0x%02x, name: %s)...\n",
+			    md.base, (void *)((size_t)md.base + md.len),
+			    md.flags, md.name);
+#else
+		uk_pr_debug("Try memory region: %p - %p (flags: 0x%02x)...\n",
+			    md.base, (void *)((size_t)md.base + md.len),
+			    md.flags);
+#endif
+
+		/* try to use memory region to initialize allocator
+		 * if it fails, we will try  again with the next region.
+		 * As soon we have an allocator, we simply add every
+		 * subsequent region to it
+		 */
+		if (unlikely(!a))
+			a = uk_allocbbuddy_init(md.base, md.len);
+		else
+			uk_alloc_addmem(a, md.base, md.len);
+	}
+
+	if (unlikely(!a))
+		uk_pr_warn("No suitable memory region for memory allocator. Continue without heap\n");
+	else {
+		rc = ukplat_memallocator_set(a);
+		if (unlikely(rc != 0))
+			UK_CRASH("Could not set the platform memory allocator\n");
+	}
+}
+
 void _libkvmplat_entry(void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
+	struct ukplat_memregion_desc img;
 
 	_init_cpufeatures();
 	_libkvmplat_init_console();
@@ -277,24 +321,63 @@ void _libkvmplat_entry(void *arg)
 	_mb_init_mem(mi);
 	_mb_init_initrd(mi);
 
+	if (_libkvmplat_cfg.initrd.len)
+		uk_pr_info("        initrd: %p\n",
+			   (void *) _libkvmplat_cfg.initrd.start);
+	uk_pr_info("    heap start: %p\n",
+		   (void *) _libkvmplat_cfg.heap.start);
+	if (_libkvmplat_cfg.heap2.len)
+		uk_pr_info(" heap start (2): %p\n",
+			   (void *) _libkvmplat_cfg.heap2.start);
+	uk_pr_info("     stack top: %p\n",
+		   (void *) _libkvmplat_cfg.bstack.start);
+
+/*
 	uk_pr_info("We have initrd at address: %p with %d length\n", _libkvmplat_cfg.initrd.start, _libkvmplat_cfg.initrd.len);
 
-	/* print contents of initrd */
-	// unsigned char *ptr = 0x117000;
-	// int i;
-    // for (i=0; i<80; i++) {
-    //     uk_pr_info("%02hhX ", ptr[i]);
-	// }
-	// uk_pr_info("\n");
+	unsigned char *ptr = 0x117000;
+	int i;
+    for (i=0; i<80; i++) {
+        uk_pr_info("%02hhX ", ptr[i]);
+	}
+	uk_pr_info("\n");
 
-	Elf64_Ehdr *ehdr = (Elf64_Ehdr *) _libkvmplat_cfg.initrd.start;
-	uk_pr_info("Entry Address: 0x%lx\n", ehdr->e_entry);
-
-	//void (*foo)(void) = (void (*)())0x117000;
+	void (*foo)(void) = (void (*)())0x117000;
 	uk_pr_info("Jumping to initrd\n");
-	//foo();
-	//goto *ptr;
-	uk_pr_info("Return from initrd\n");
+	foo();
+	goto *ptr;
+	uk_pr_info("Return from initrd\n"); */
+
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		UK_CRASH("Failed to initialize libelf: Version error");
+
+	uk_pr_info("Searching for image...\n");
+	int rc = ukplat_memregion_find_initrd0(&img);
+	if (rc < 0 || !img.base || !img.len) {
+		uk_pr_info("Error1\n");
+	}
+
+	uk_pr_info("Image at %p, len %"__PRIsz" bytes\n",
+		   img.base, img.len);
+
+	initialize_allocator();
+
+	/*
+	 * Parse image
+	 */
+	uk_pr_info("Load image...\n");
+	void  *prog = load_elf(uk_alloc_get_default(), img.base, img.len, "test");
+	if (!prog) {
+		uk_pr_info("Error2\n");
+	}
+
+	/*
+	 * Execute program
+	 */
+	int fake_argc = 1;
+	char *fake_argv[] = {"static_kernel"};
+	uk_pr_debug("Execute image...\n");
+	exec_elf(prog, fake_argc, fake_argv, NULL, 0xFEED, 0xC0FFEE);
 
 	ukplat_terminate(UKPLAT_HALT);
 }
