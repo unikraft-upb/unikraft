@@ -1,5 +1,21 @@
-INCLUDES = -I./include -Iplat/kvm/include/kvm -Inolibc/include -Ilibelf/include -I./plat/kvm/include \
--I./elfloader
+INCLUDES = -I./include -Iplat/kvm/include/kvm -Inolibc/include -Ilibelf/include \
+-I./plat/kvm/include -I./elfloader
+
+CFLAGS = -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
+-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
+-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~0453b2e -O0 -fno-optimize-sibling-calls \
+-fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks \
+-fno-asynchronous-unwind-tables  -mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf \
+-fno-builtin-fprintf -fno-builtin-sprintf -fno-builtin-snprintf -fno-builtin-vprintf \
+-fno-builtin-vfprintf -fno-builtin-vsprintf -fno-builtin-vsnprintf -fno-builtin-scanf \
+-fno-builtin-fscanf -fno-builtin-sscanf -fno-builtin-vscanf -fno-builtin-vfscanf \
+-fno-builtin-vsscanf -DKVMPLAT -g3
+
+LDFLAGS = -r -nostdinc -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie  -Wl,-m,elf_x86_64
+
+OBJS = entry64.o setup.o cpu_features.common.o print.o console.o serial_console.o memory.o vga_console.o \
+shutdown.o cpu_native.o alloc.o bbuddy.o build/libnolibc.o build/libelf.o build/elfloader.o
+
 
 
 all: entry64 cpu_features print nolib libelfa elfloadera setup shutdown cpu_native\
@@ -9,166 +25,95 @@ entry64:
 	gcc $(INCLUDES) -DCC_VERSION=7.5 -D__X86_64__ -m64 -U __linux__ -U __FreeBSD__ \
 	-U __sun__ -D__ASSEMBLY__ -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 \
 	-DUK_FULLVERSION=0.4.0~00bbf2c -mtune=generic -no-pie -g3 -DKVMPLAT -D__LIBNAME__=libkvmplat \
-	-D__BASENAME__=entry64.S -c entry64.S -o entry64.o -Wp,-MD,.entry64.o.d
+	-D__BASENAME__=entry64.S -c entry64.S -o entry64.o -Wp,-MD,.entry64.o.d \
 
 link_script:
 	gcc  -E -P -x assembler-with-cpp  $(INCLUDES)  -DCC_VERSION=7.5 -D__X86_64__ -m64 -U __linux__ \
 	-U __FreeBSD__ -U __sun__ -D__ASSEMBLY__ -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 \
 	-DUK_FULLVERSION=0.4.0~71946ac  -mtune=generic -no-pie -DKVMPLAT link64.lds.S -o link64.lds \
-	-Wp,-MD,.link64.lds.d
+	-Wp,-MD,.link64.lds.d \
 
 final_link:
-	gcc -r -nostdinc -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie  -Wl,-m,elf_x86_64 \
-	entry64.o setup.o cpu_features.common.o print.o console.o serial_console.o memory.o vga_console.o shutdown.o \
-	cpu_native.o alloc.o bbuddy.o build/libnolibc.o build/libelf.o build/elfloader.o \
-	-Wl,--start-group    -Wl,--end-group -o static_kernel.ld.o
+	gcc $(LDFLAGS) $(OBJS) \
+	-Wl,--start-group    -Wl,--end-group -o static_kernel.ld.o \
 
-	objcopy -w -G kvmos_* -G _libkvmplat_entry static_kernel.ld.o static_kernel.o
+	objcopy -w -G kvmos_* -G _libkvmplat_entry static_kernel.ld.o static_kernel.o \
 
 	gcc  -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none  -no-pie  -Wl,-m,elf_x86_64 -Wl,-dT,link64.lds \
-	-Wl,-T,ukdebug/extra.ld -Wl,-T,vfscore/extra.ld  static_kernel.o -o static_kernel.dbg
+	-Wl,-T,ukdebug/extra.ld -Wl,-T,vfscore/extra.ld  static_kernel.o -o static_kernel.dbg \
 
 cpu_features:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector -fno-omit-frame-pointer \
-	$(INCLUDES) \
-	-fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~0453b2e \
-	-O0 -fno-optimize-sibling-calls -fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks \
-	-fno-asynchronous-unwind-tables  -mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf \
-	-fno-builtin-sprintf -fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf -fno-builtin-vscanf \
-	-fno-builtin-vfscanf -fno-builtin-vsscanf -DKVMPLAT       -g3 -D__LIBNAME__=libkvmplat -D__BASENAME__=cpu_features.c \
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libkvmplat -D__BASENAME__=cpu_features.c \
 	-D__VARIANT__=common -c /home/daniel/Faculty/BachelorThesis/unikraft/plat/common/x86/cpu_features.c \
-	-o cpu_features.common.o -Wp,-MD,.cpu_features.common.o.d
+	-o cpu_features.common.o -Wp,-MD,.cpu_features.common.o.d \
 
 setup:
-	gcc $(INCLUDES) -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector -fno-omit-frame-pointer \
-	-fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7 \
-	-O0 -fno-optimize-sibling-calls -fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks \
-	-fno-asynchronous-unwind-tables  -mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf \
-	-fno-builtin-sprintf -fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf -fno-builtin-vscanf \
-	-fno-builtin-vfscanf -fno-builtin-vsscanf -DKVMPLAT       -g3 -D__LIBNAME__=libkvmplat -D__BASENAME__=setup.c \
-	-c setup.c -o setup.o -Wp,-MD,.setup.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libkvmplat -D__BASENAME__=setup.c \
+	-c setup.c -o setup.o -Wp,-MD,.setup.o.d \
 
 print:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=print.c  -c print.c -o print.o -Wp,-MD,.print.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=print.c \
+	 -c print.c -o print.o -Wp,-MD,.print.o.d \
 
 console:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=console.c  -c console.c -o console.o -Wp,-MD,.console.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=console.c \
+	 -c console.c -o console.o -Wp,-MD,.console.o.d \
 
 memory:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector -fno-omit-frame-pointer \
-	$(INCLUDES) \
-	-fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~0453b2e \
-	-O0 -fno-optimize-sibling-calls -fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks \
-	-fno-asynchronous-unwind-tables  -mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf \
-	-fno-builtin-sprintf -fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf -fno-builtin-vscanf \
-	-fno-builtin-vfscanf -fno-builtin-vsscanf -DKVMPLAT       -g3 -D__LIBNAME__=libkvmplat -D__BASENAME__=memory.c \
-	-D__VARIANT__=common -c memory.c \
-	-o memory.o -Wp,-MD,.memory.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libkvmplat -D__BASENAME__=memory.c \
+	-D__VARIANT__=common -c memory.c -o memory.o -Wp,-MD,.memory.o.d \
 
 bbuddy:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector -fno-omit-frame-pointer \
-	$(INCLUDES) \
-	-fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" -DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~0453b2e \
-	-O0 -fno-optimize-sibling-calls -fno-tree-vectorize -no-pie -D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks \
-	-fno-asynchronous-unwind-tables  -mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf \
-	-fno-builtin-sprintf -fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf -fno-builtin-vscanf \
-	-fno-builtin-vfscanf -fno-builtin-vsscanf -DKVMPLAT       -g3 -D__LIBNAME__=libbuddy -D__BASENAME__=bbuddy.c \
-	-D__VARIANT__=common -c bbuddy.c \
-	-o bbuddy.o -Wp,-MD,.bbuddy.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libbuddy -D__BASENAME__=bbuddy.c \
+	-D__VARIANT__=common -c bbuddy.c -o bbuddy.o -Wp,-MD,.bbuddy.o.d \
 
 serial_console:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=serial_console.c  -c serial_console.c -o serial_console.o -Wp,-MD,.serial_console.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=serial_console.c \
+	-D__VARIANT__=common -c serial_console.c -o serial_console.o -Wp,-MD,.serial_console.o.d \
 
 vga_console:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=vga_console.c  -c vga_console.c -o vga_console.o -Wp,-MD,.vga_console.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=vga_console.c \
+	-D__VARIANT__=common -c vga_console.c -o vga_console.o -Wp,-MD,.vga_console.o.d \
 
 shutdown:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=shutdown.c  -c shutdown.c -o shutdown.o -Wp,-MD,.shutdown.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=shutdown.c \
+	-D__VARIANT__=common -c shutdown.c -o shutdown.o -Wp,-MD,.shutdown.o.d \
 
 cpu_native:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=cpu_native.c  -c cpu_native.c -o cpu_native.o -Wp,-MD,.cpu_native.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=cpu_native.c \
+	-D__VARIANT__=common -c cpu_native.c -o cpu_native.o -Wp,-MD,.cpu_native.o.d \
 
 alloc:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=alloc.c  -c alloc.c -o alloc.o -Wp,-MD,.alloc.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=alloc.c \
+	-D__VARIANT__=common -c alloc.c -o alloc.o -Wp,-MD,.alloc.o.d \
 
 time:
-	gcc   -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
-	-fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
-	-DUK_VERSION=0.4 -DUK_FULLVERSION=0.4.0~62c61a7  -O0 -fno-optimize-sibling-calls \
-	-fno-tree-vectorize -no-pie $(INCLUDES) \
-	-D__X86_64__ -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables \
-	-mtune=generic  -DCC_VERSION=7.5  -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-sprintf \
-	-fno-builtin-snprintf -fno-builtin-vprintf -fno-builtin-vfprintf -fno-builtin-vsprintf \
-	-fno-builtin-vsnprintf -fno-builtin-scanf -fno-builtin-fscanf -fno-builtin-sscanf \
-	-fno-builtin-vscanf -fno-builtin-vfscanf -fno-builtin-vsscanf  -D__IN_LIBUKDEBUG__      -g3 \
-	-D__LIBNAME__=libukdebug -D__BASENAME__=time.c  -c time.c -o time.o -Wp,-MD,.time.o.d
+	gcc $(INCLUDES) \
+	 $(CFLAGS) \
+	-D__LIBNAME__=libukdebug -D__BASENAME__=time.c \
+	-D__VARIANT__=common -c time.c -o time.o -Wp,-MD,.time.o.d \
 
 nolib:
 	make -f Makefile_nolibc
