@@ -40,6 +40,7 @@
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <stdio.h>
 
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
@@ -256,46 +257,48 @@ static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
 }
 
-void _libkvmplat_entry(void *arg)
+void _libkvmplat_entry(int argc, char *argv[])
 {
-	struct multiboot_info *mi = (struct multiboot_info *)arg;
+	//struct multiboot_info *mi = (struct multiboot_info *)arg;
 
 	_init_cpufeatures();
 	_libkvmplat_init_console();
 	traps_init();
 	intctrl_init();
 
-	uk_pr_info("Entering from KVM (x86)...\n");
-	uk_pr_info("     multiboot: %p\n", mi);
+	// uk_pr_info("Entering from KVM (x86)...\n");
+	// uk_pr_info("     multiboot: %p\n", mi);
+
+	printf("Is working %d\n", argc);
 
 	/*
 	 * The multiboot structures may be anywhere in memory, so take a copy of
 	 * everything necessary before we initialise memory allocation.
 	 */
-	_mb_get_cmdline(mi);
-	_mb_init_mem(mi);
-	_mb_init_initrd(mi);
+// 	_mb_get_cmdline(mi);
+// 	_mb_init_mem(mi);
+// 	_mb_init_initrd(mi);
 
-	if (_libkvmplat_cfg.initrd.len)
-		uk_pr_info("        initrd: %p\n",
-			   (void *) _libkvmplat_cfg.initrd.start);
-	uk_pr_info("    heap start: %p\n",
-		   (void *) _libkvmplat_cfg.heap.start);
-	if (_libkvmplat_cfg.heap2.len)
-		uk_pr_info(" heap start (2): %p\n",
-			   (void *) _libkvmplat_cfg.heap2.start);
-	uk_pr_info("     stack top: %p\n",
-		   (void *) _libkvmplat_cfg.bstack.start);
+// 	if (_libkvmplat_cfg.initrd.len)
+// 		uk_pr_info("        initrd: %p\n",
+// 			   (void *) _libkvmplat_cfg.initrd.start);
+// 	uk_pr_info("    heap start: %p\n",
+// 		   (void *) _libkvmplat_cfg.heap.start);
+// 	if (_libkvmplat_cfg.heap2.len)
+// 		uk_pr_info(" heap start (2): %p\n",
+// 			   (void *) _libkvmplat_cfg.heap2.start);
+// 	uk_pr_info("     stack top: %p\n",
+// 		   (void *) _libkvmplat_cfg.bstack.start);
 
-#ifdef CONFIG_HAVE_SYSCALL
-	_init_syscall();
-#endif /* CONFIG_HAVE_SYSCALL */
+// #ifdef CONFIG_HAVE_SYSCALL
+// 	_init_syscall();
+// #endif /* CONFIG_HAVE_SYSCALL */
 
-	/*
-	 * Switch away from the bootstrap stack as early as possible.
-	 */
-	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
-		   (void *) _libkvmplat_cfg.bstack.end);
-	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end,
-			     _libkvmplat_entry2, 0);
+// 	/*
+// 	 * Switch away from the bootstrap stack as early as possible.
+// 	 */
+// 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
+// 		   (void *) _libkvmplat_cfg.bstack.end);
+// 	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end,
+// 			     _libkvmplat_entry2, 0);
 }

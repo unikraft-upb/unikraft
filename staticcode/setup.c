@@ -374,8 +374,8 @@ void _libkvmplat_entry(void *arg)
 	/*
 	 * Execute program
 	 */
-	int fake_argc = 1;
-	char *fake_argv[] = {"static_kernel"};
+	int fake_argc = 2;
+	char *fake_argv[] = {"my_elf", "static_kernel"};
 	uk_pr_debug("Execute image...\n");
 	exec_elf(prog, fake_argc, fake_argv, NULL, 0xFEED, 0xC0FFEE);
 
