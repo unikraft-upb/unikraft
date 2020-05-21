@@ -30,22 +30,30 @@
 #if CONFIG_OPTIMIZE_PGO_GENERATE
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <dirent.h>
 
-#define GCOV_GENERATE_FILE	"/home/alice/Documents/Diploma/Comp-opt/apps/helloworld/build/apphelloworld/main.gcda"
+#define GCOV_GENERATED_DIR	"/gcov_profiling"
+#define GCOV_PREFIX_STRIP_LENGTH	"100"
 
-void create_hierarchy()
+void set_path_gcov_files()
 {
-	mkdir("/home", 0777);
-	mkdir("/home/alice", 0777);
-	mkdir("/home/alice/Documents", 0777);
-	mkdir("/home/alice/Documents/Diploma", 0777);
-	mkdir("/home/alice/Documents/Diploma/Comp-opt", 0777);
-	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps", 0777);
-	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps/helloworld", 0777);
-	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps/helloworld/build", 0777);
-	mkdir("/home/alice/Documents/Diploma/Comp-opt/apps/helloworld/build/apphelloworld", 0777);
-}
+	const char *gcov_prefix;
+	const char *gcov_strip;
 
+	gcov_prefix = getenv("GCOV_PREFIX");
+	if (!gcov_prefix)
+		setenv("GCOV_PREFIX", GCOV_GENERATED_DIR, 1);
+
+	gcov_strip = getenv("GCOV_PREFIX_STRIP");
+	if (!gcov_strip)
+		setenv("GCOV_PREFIX_STRIP", GCOV_PREFIX_STRIP_LENGTH, 1);
+
+	DIR* dir = opendir(GCOV_GENERATED_DIR);
+	if (dir)
+		closedir(dir);
+	else if (ENOENT == errno)
+		mkdir(GCOV_GENERATED_DIR, 0777);
+}
 #endif
 
 static void cpu_halt(void) __noreturn;
@@ -55,7 +63,7 @@ void ukplat_terminate(enum ukplat_gstate request __unused)
 {
 
 #if CONFIG_OPTIMIZE_PGO_GENERATE
-	create_hierarchy();
+	set_path_gcov_files();
 	__gcov_exit();
 #endif
 
