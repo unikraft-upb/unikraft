@@ -332,22 +332,6 @@ void _libkvmplat_entry(void *arg)
 	uk_pr_info("     stack top: %p\n",
 		   (void *) _libkvmplat_cfg.bstack.start);
 
-/*
-	uk_pr_info("We have initrd at address: %p with %d length\n", _libkvmplat_cfg.initrd.start, _libkvmplat_cfg.initrd.len);
-
-	unsigned char *ptr = 0x117000;
-	int i;
-    for (i=0; i<80; i++) {
-        uk_pr_info("%02hhX ", ptr[i]);
-	}
-	uk_pr_info("\n");
-
-	void (*foo)(void) = (void (*)())0x117000;
-	uk_pr_info("Jumping to initrd\n");
-	foo();
-	goto *ptr;
-	uk_pr_info("Return from initrd\n"); */
-
 	if (elf_version(EV_CURRENT) == EV_NONE)
 		UK_CRASH("Failed to initialize libelf: Version error");
 
@@ -366,18 +350,23 @@ void _libkvmplat_entry(void *arg)
 	 * Parse image
 	 */
 	uk_pr_info("Load image...\n");
-	void  *prog = load_elf(uk_alloc_get_default(), img.base, img.len, "test");
+	struct elf_prog  *prog = load_elf(uk_alloc_get_default(), img.base, img.len, "test");
 	if (!prog) {
 		uk_pr_info("Error2\n");
 	}
 
+	/* Jump to elf entry */
+	uk_pr_info("Entry point at %p\n", prog->entry);
+	void (*elf_entry)(void *) = (void (*)(void *))prog->entry;
+	elf_entry(arg);
+
 	/*
 	 * Execute program
 	 */
-	int fake_argc = 2;
-	char *fake_argv[] = {"my_elf", "static_kernel"};
-	uk_pr_debug("Execute image...\n");
-	exec_elf(prog, fake_argc, fake_argv, NULL, 0xFEED, 0xC0FFEE);
+	// int fake_argc = 2;
+	// char *fake_argv[] = {"my_elf", "static_kernel"};
+	// uk_pr_debug("Execute image...\n");
+	// exec_elf(prog, fake_argc, fake_argv, NULL, 0xFEED, 0xC0FFEE);
 
 	ukplat_terminate(UKPLAT_HALT);
 }
