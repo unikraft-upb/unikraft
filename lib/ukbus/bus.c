@@ -36,6 +36,7 @@
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/init.h>
+#include <uk/sections.h>
 
 UK_LIST_HEAD(uk_bus_list);
 static unsigned int bus_count;
@@ -102,6 +103,9 @@ static unsigned int uk_bus_init_all(struct uk_alloc *a)
 		return 0;
 
 	uk_list_for_each_entry_safe(b, b_next, &uk_bus_list, list) {
+		printf("Old bus init address: %p\n", b);
+		b = (struct uk_bus *)((long)b - 0x100000 + (long)_text);
+		printf("New bus init address: %p\n", b);
 		if ((status = uk_bus_init(b, a)) >= 0) {
 			++ret;
 		} else {
@@ -125,6 +129,9 @@ static unsigned int uk_bus_probe_all(void)
 		return 0;
 
 	uk_list_for_each_entry(b, &uk_bus_list, list) {
+		printf("Old bus probe address: %p\n", b);
+		b = (struct uk_bus *)((long)b - 0x100000 + (long)_text);
+		printf("New bus probe address: %p\n", b);
 		if (uk_bus_probe(b) >= 0)
 			++ret;
 	}

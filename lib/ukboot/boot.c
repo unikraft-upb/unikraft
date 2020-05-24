@@ -40,6 +40,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <errno.h>
+#include <uk/sections.h>
 
 #if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
 #include <uk/allocbbuddy.h>
@@ -82,19 +83,20 @@ static void main_thread_func(void *arg)
 	/**
 	 * Run init table
 	 */
-	uk_pr_info("Init Table @ %p - %p\n",
-		   &uk_inittab_start[0], &uk_inittab_end);
-	uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
-		UK_ASSERT(*initfn);
-		uk_pr_debug("Call init function: %p()...\n", *initfn);
-		ret = (*initfn)();
-		if (ret < 0) {
-			uk_pr_err("Init function at %p returned error %d\n",
-				  *initfn, ret);
-			ret = UKPLAT_CRASH;
-			goto exit;
-		}
-	}
+	// uk_pr_info("Init Table @ %p - %p\n",
+	// 	   &uk_inittab_start[0], &uk_inittab_end);
+	// uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
+	// 	*initfn = (uk_init_func_t)((long)*initfn + (long)_text - 0x100000);
+	// 	UK_ASSERT(*initfn);
+	// 	uk_pr_debug("Call init function: %p()...\n", *initfn);
+	// 	ret = (*initfn)();
+	// 	if (ret < 0) {
+	// 		uk_pr_err("Init function at %p returned error %d\n",
+	// 			  *initfn, ret);
+	// 		ret = UKPLAT_CRASH;
+	// 		goto exit;
+	// 	}
+	// }
 
 #if CONFIG_LIBUKBOOT_BANNER
 	printf("Welcome to  _ __             _____\n");
@@ -118,6 +120,7 @@ static void main_thread_func(void *arg)
 		   &__preinit_array_start[0], &__preinit_array_end);
 	uk_ctortab_foreach(ctorfn,
 			   __preinit_array_start, __preinit_array_end) {
+		*ctorfn = (uk_ctor_func_t)((long)*ctorfn + (long)_text - 0x100000);
 		if (!*ctorfn)
 			continue;
 
@@ -128,6 +131,7 @@ static void main_thread_func(void *arg)
 	uk_pr_info("Constructor table at %p - %p\n",
 		   &__init_array_start[0], &__init_array_end);
 	uk_ctortab_foreach(ctorfn, __init_array_start, __init_array_end) {
+		*ctorfn = (uk_ctor_func_t)((long)*ctorfn + (long)_text - 0x100000);
 		if (!*ctorfn)
 			continue;
 
@@ -190,6 +194,7 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
 		   &uk_ctortab_start[0], &uk_ctortab_end);
 	uk_ctortab_foreach(ctorfn, uk_ctortab_start, uk_ctortab_end) {
+		*ctorfn = (uk_ctor_func_t)((long)*ctorfn + (long)_text - 0x100000);
 		UK_ASSERT(*ctorfn);
 		uk_pr_debug("Call constructor: %p())...\n", *ctorfn);
 		(*ctorfn)();
