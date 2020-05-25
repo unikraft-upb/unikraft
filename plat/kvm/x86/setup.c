@@ -254,7 +254,7 @@ no_initrd:
 
 static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 {
-	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
+	ukplat_entry_argp(NULL, "ELF_KERNEL", 11);
 }
 
 void _libkvmplat_entry(void *arg)

@@ -59,6 +59,7 @@
 #include <uk/ctors.h>
 #include <uk/init.h>
 #include <uk/argparse.h>
+#include <uk/bus.h>
 #ifdef CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
@@ -83,20 +84,20 @@ static void main_thread_func(void *arg)
 	/**
 	 * Run init table
 	 */
-	// uk_pr_info("Init Table @ %p - %p\n",
-	// 	   &uk_inittab_start[0], &uk_inittab_end);
-	// uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
-	// 	*initfn = (uk_init_func_t)((long)*initfn + (long)_text - 0x100000);
-	// 	UK_ASSERT(*initfn);
-	// 	uk_pr_debug("Call init function: %p()...\n", *initfn);
-	// 	ret = (*initfn)();
-	// 	if (ret < 0) {
-	// 		uk_pr_err("Init function at %p returned error %d\n",
-	// 			  *initfn, ret);
-	// 		ret = UKPLAT_CRASH;
-	// 		goto exit;
-	// 	}
-	// }
+	uk_pr_info("Init Table @ %p - %p\n",
+		   &uk_inittab_start[0], &uk_inittab_end);
+	uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
+		*initfn = (uk_init_func_t)((long)*initfn + (long)_text - 0x100000);
+		UK_ASSERT(*initfn);
+		uk_pr_debug("Call init function: %p()...\n", *initfn);
+		ret = (*initfn)();
+		if (ret < 0) {
+			uk_pr_err("Init function at %p returned error %d\n",
+				  *initfn, ret);
+			ret = UKPLAT_CRASH;
+			goto exit;
+		}
+	}
 
 #if CONFIG_LIBUKBOOT_BANNER
 	printf("Welcome to  _ __             _____\n");
@@ -146,7 +147,6 @@ static void main_thread_func(void *arg)
 			uk_pr_info(", ");
 	}
 	uk_pr_info("])\n");
-
 	ret = main(tma->argc, tma->argv);
 	uk_pr_info("main returned %d, halting system\n", ret);
 	ret = (ret != 0) ? UKPLAT_CRASH : UKPLAT_HALT;
@@ -191,6 +191,8 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 	uk_ctor_func_t *ctorfn;
 
+
+	UK_INIT_LIST_HEAD(&uk_bus_list);
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
 		   &uk_ctortab_start[0], &uk_ctortab_end);
 	uk_ctortab_foreach(ctorfn, uk_ctortab_start, uk_ctortab_end) {

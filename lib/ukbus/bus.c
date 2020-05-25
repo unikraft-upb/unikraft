@@ -76,7 +76,10 @@ static int uk_bus_init(struct uk_bus *b, struct uk_alloc *a)
 {
 	UK_ASSERT(b != NULL);
 
-	uk_pr_debug("Initialize bus handler %p...\n", b);
+	uk_pr_debug("Change function pointers %p %p %p...\n", b, b->init, b->probe);
+	b->init = (uk_bus_init_func_t)((long)b->init - 0x100000 + (long)_text);
+	b->probe = (uk_bus_probe_func_t)((long)b->probe - 0x100000 + (long)_text);
+	uk_pr_debug("Change function pointers %p %p %p...\n", b, b->init, b->probe);
 	if (!b->init)
 		return 0;
 	return b->init(a);
@@ -103,9 +106,11 @@ static unsigned int uk_bus_init_all(struct uk_alloc *a)
 		return 0;
 
 	uk_list_for_each_entry_safe(b, b_next, &uk_bus_list, list) {
-		printf("Old bus init address: %p\n", b);
-		b = (struct uk_bus *)((long)b - 0x100000 + (long)_text);
-		printf("New bus init address: %p\n", b);
+		printf("Current bus addr: %p\n", b);
+		if ((long)b < 0x7c01000) {
+			printf("Not in our range, skip\n");
+			continue;
+		}
 		if ((status = uk_bus_init(b, a)) >= 0) {
 			++ret;
 		} else {
@@ -129,9 +134,11 @@ static unsigned int uk_bus_probe_all(void)
 		return 0;
 
 	uk_list_for_each_entry(b, &uk_bus_list, list) {
-		printf("Old bus probe address: %p\n", b);
-		b = (struct uk_bus *)((long)b - 0x100000 + (long)_text);
-		printf("New bus probe address: %p\n", b);
+		printf("Current bus addr: %p\n", b);
+		if ((long)b < 0x7c01000) {
+			printf("Not in our range, skip\n");
+			continue;
+		}
 		if (uk_bus_probe(b) >= 0)
 			++ret;
 	}

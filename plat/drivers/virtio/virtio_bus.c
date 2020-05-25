@@ -40,6 +40,7 @@
 #include <virtio/virtio_ids.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_bus.h>
+#include <stdio.h>
 
 UK_TAILQ_HEAD(virtio_driver_list, struct virtio_driver);
 /**
@@ -179,6 +180,7 @@ virtio_dev_fail_set:
  */
 static int virtio_bus_probe(void)
 {
+	uk_pr_info("Probe VIRTIO\n");
 	return 0;
 }
 
@@ -196,7 +198,10 @@ static int virtio_bus_init(struct uk_alloc *mem_alloc)
 	struct virtio_driver *drv = NULL, *ndrv = NULL;
 	int ret = 0, dev_count = 0;
 
+	uk_pr_info("Here we are in virtio bus init!\n");
+
 	a = mem_alloc;
+
 	UK_TAILQ_FOREACH_SAFE(drv, &virtio_drvs, next, ndrv) {
 		if (drv->init) {
 			ret = drv->init(a);
@@ -208,6 +213,7 @@ static int virtio_bus_init(struct uk_alloc *mem_alloc)
 				dev_count++;
 		}
 	}
+
 	return (dev_count > 0) ? dev_count : 0;
 }
 

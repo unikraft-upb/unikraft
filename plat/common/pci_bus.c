@@ -56,6 +56,8 @@
 #include <uk/print.h>
 #include <uk/plat/common/cpu.h>
 #include <pci/pci_bus.h>
+#include <stdio.h>
+#include <uk/sections.h>
 
 struct pci_bus_handler {
 	struct uk_bus b;
@@ -172,6 +174,7 @@ static inline struct pci_driver *pci_find_driver(struct pci_device_id *id)
 				return drv;
 		}
 	}
+
 	return NULL; /* no driver found */
 }
 
@@ -287,6 +290,9 @@ static int pci_init(struct uk_alloc *a)
 	struct pci_driver *drv, *drv_next;
 	int ret = 0;
 
+	uk_pr_info("Here we are in pci_init\n");
+	UK_INIT_LIST_HEAD(&ph.drv_list);
+
 	UK_ASSERT(a != NULL);
 
 	ph.a = a;
@@ -301,6 +307,7 @@ static int pci_init(struct uk_alloc *a)
 			uk_list_del_init(&drv->list);
 		}
 	}
+
 	return 0;
 }
 
