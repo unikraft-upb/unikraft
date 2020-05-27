@@ -1,5 +1,5 @@
 INCLUDES = -I./include -Iplat/kvm/include/kvm -Inolibc/include -Ilibelf/include \
--I./plat/kvm/include -I./elfloader
+-I./plat/kvm/include -Iukswrand/include -I./elfloader
 
 CFLAGS = -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-protector \
 -fno-omit-frame-pointer -fno-tree-sra -Wall -Wextra -D __Unikraft__ -DUK_CODENAME="Rhea" \
@@ -13,12 +13,11 @@ CFLAGS = -nostdinc -nostdlib -U __linux__ -U __FreeBSD__ -U __sun__ -fno-stack-p
 
 LDFLAGS = -r -nostdinc -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie  -Wl,-m,elf_x86_64
 
-OBJS = entry64.o setup.o cpu_features.common.o print.o console.o serial_console.o memory.o vga_console.o \
-shutdown.o cpu_native.o alloc.o bbuddy.o build/libnolibc.o build/libelf.o build/elfloader.o
+OBJS = entry64.o setup.o cpu_features.common.o print.o console.o serial_console.o memory.o \
+vga_console.o shutdown.o cpu_native.o alloc.o bbuddy.o build/libnolibc.o build/libelf.o \
+build/elfloader.o build/ukswrand.o
 
-
-
-all: entry64 cpu_features print nolib libelfa elfloadera setup shutdown cpu_native\
+all: entry64 cpu_features print nolib libelfa ukswranda elfloadera setup shutdown cpu_native \
 	 alloc console memory bbuddy serial_console vga_console link_script final_link
 
 entry64:
@@ -124,6 +123,9 @@ libelfa:
 elfloadera:
 	make -f Makefile_elfloader
 
+ukswranda:
+	make -f Makefile_ukswrand
+
 run:
 	sudo qemu-system-x86_64 -enable-kvm -nographic -device isa-debug-exit -kernel $(exec)
 
@@ -136,3 +138,4 @@ clean:
 	make clean -f Makefile_nolibc
 	make clean -f Makefile_libelf
 	make clean -f Makefile_elfloader
+	make clean -f Makefile_ukswrand

@@ -1,0 +1,7 @@
+getrandom
+uk_swrand_ctor
+uk_swrand_def
+uk_swrand_init_r
+uk_swrand_randr_r
+uk_swrandr_gen_seed32
+aslr_uk_swrand_ctor

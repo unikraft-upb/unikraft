@@ -52,6 +52,9 @@
 #include <uk/essentials.h>
 #include <uk/plat/memory.h>
 #include <uk/allocbbuddy.h>
+#include <sys/random.h>
+#include <uk/swrand.h>
+#include <stdio.h>
 
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
@@ -345,6 +348,20 @@ void _libkvmplat_entry(void *arg)
 		   img.base, img.len);
 
 	initialize_allocator();
+
+	/* initialize randomizer */
+	aslr_uk_swrand_ctor();
+
+	char *buffer = malloc(100);
+
+	uk_pr_info("Random returned: %d\n", getrandom(buffer, 100, GRND_RANDOM));
+
+	int i;
+	for (i = 0; i < 100; i++)
+	{
+		printf("%d ", buffer[i]);
+	}
+	printf("\n");
 
 	/*
 	 * Parse image
