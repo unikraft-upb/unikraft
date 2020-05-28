@@ -23,7 +23,7 @@ struct elf_prog {
  * @return 0 on success, *out is filled out
  */
 struct elf_prog *load_elf(struct uk_alloc *a, void *img_base, size_t img_len,
-			  const char *progname);
+			  const char *progname, void *elf_load_address);
 
 /**
  * Starts execution of *prog previosuly loaded by `load_elf()`

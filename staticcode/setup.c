@@ -305,6 +305,26 @@ static inline void initialize_allocator()
 	}
 }
 
+static inline int get_random_addr(int img_len)
+{
+	int random_addr, remaining_space;
+
+	/* search for a valid address for the pie kernel */
+	while (1) {
+		random_addr = uk_swrand_randr() % 0xffffff;
+		random_addr = random_addr/__PAGE_SIZE * __PAGE_SIZE;
+		remaining_space = PLATFORM_MAX_MEM_ADDR - random_addr;
+		if (random_addr < 0x141000 + img_len)
+			continue;
+		if (remaining_space > img_len)
+			break;
+	}
+
+	uk_pr_info("Random address for pie kernel: %p\n", random_addr);
+
+	return random_addr;
+}
+
 void _libkvmplat_entry(void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
@@ -352,38 +372,22 @@ void _libkvmplat_entry(void *arg)
 	/* initialize randomizer */
 	aslr_uk_swrand_ctor();
 
-	char *buffer = malloc(100);
-
-	uk_pr_info("Random returned: %d\n", getrandom(buffer, 100, GRND_RANDOM));
-
-	int i;
-	for (i = 0; i < 100; i++)
-	{
-		printf("%d ", buffer[i]);
-	}
-	printf("\n");
+	void *elf_load_address = get_random_addr(_libkvmplat_cfg.initrd.len);
 
 	/*
 	 * Parse image
 	 */
 	uk_pr_info("Load image...\n");
-	struct elf_prog  *prog = load_elf(uk_alloc_get_default(), img.base, img.len, "test");
+	struct elf_prog  *prog = load_elf(uk_alloc_get_default(), img.base, img.len,
+					"PIE kernel", elf_load_address);
 	if (!prog) {
-		uk_pr_info("Error2\n");
+		uk_pr_info("Error loading the elf\n");
 	}
 
 	/* Jump to elf entry */
 	uk_pr_info("Entry point at %p\n", prog->entry);
 	void (*elf_entry)(void *) = (void (*)(void *))prog->entry;
 	elf_entry(arg);
-
-	/*
-	 * Execute program
-	 */
-	// int fake_argc = 2;
-	// char *fake_argv[] = {"my_elf", "static_kernel"};
-	// uk_pr_debug("Execute image...\n");
-	// exec_elf(prog, fake_argc, fake_argv, NULL, 0xFEED, 0xC0FFEE);
 
 	ukplat_terminate(UKPLAT_HALT);
 }

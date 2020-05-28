@@ -10,7 +10,7 @@
 #include "binfmt_elf.h"
 
 struct elf_prog *load_elf(struct uk_alloc *a, void *img_base, size_t img_len,
-			  const char *progname)
+			  const char *progname, void *elf_load_address)
 {
 	struct elf_prog *elf_prog = NULL;
 	Elf *elf;
@@ -170,7 +170,7 @@ struct elf_prog *load_elf(struct uk_alloc *a, void *img_base, size_t img_len,
 
 	elf_prog->a = a;
 	elf_prog->img_len = (size_t) (prog_upperl - prog_lowerl);
-	elf_prog->img = 0x301000;
+	elf_prog->img = elf_load_address;
 	if (!elf_prog->img) {
 		uk_pr_debug("%s: Not enough memory to load image (failed to allocate %"PRIu64" bytes)\n",
 			    progname, (uint64_t) elf_prog->img_len);
