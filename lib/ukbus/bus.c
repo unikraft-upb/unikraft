@@ -107,10 +107,6 @@ static unsigned int uk_bus_init_all(struct uk_alloc *a)
 
 	uk_list_for_each_entry_safe(b, b_next, &uk_bus_list, list) {
 		printf("Current bus addr: %p\n", b);
-		if ((long)b < 0x7c01000) {
-			printf("Not in our range, skip\n");
-			continue;
-		}
 		if ((status = uk_bus_init(b, a)) >= 0) {
 			++ret;
 		} else {
@@ -135,10 +131,6 @@ static unsigned int uk_bus_probe_all(void)
 
 	uk_list_for_each_entry(b, &uk_bus_list, list) {
 		printf("Current bus addr: %p\n", b);
-		if ((long)b < 0x7c01000) {
-			printf("Not in our range, skip\n");
-			continue;
-		}
 		if (uk_bus_probe(b) >= 0)
 			++ret;
 	}
