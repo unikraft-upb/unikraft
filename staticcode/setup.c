@@ -61,6 +61,7 @@
 
 #define MAX_CMDLINE_SIZE 8192
 static char cmdline[MAX_CMDLINE_SIZE];
+static int max_address;
 
 struct kvmplat_config _libkvmplat_cfg = { 0 };
 
@@ -114,6 +115,8 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	if (max_addr > PLATFORM_MAX_MEM_ADDR)
 		max_addr = PLATFORM_MAX_MEM_ADDR;
 	UK_ASSERT((size_t) __END <= max_addr);
+
+	max_address = max_addr;
 
 	/*
 	 * Reserve space for boot stack at the end of found memory
@@ -311,11 +314,13 @@ static inline int get_random_addr(int img_len)
 
 	/* search for a valid address for the pie kernel */
 	while (1) {
-		random_addr = uk_swrand_randr() % 0xffffff;
+		random_addr = uk_swrand_randr() % max_address;
 		random_addr = random_addr/__PAGE_SIZE * __PAGE_SIZE;
-		remaining_space = PLATFORM_MAX_MEM_ADDR - random_addr;
+		/* we don't want for the pie kernel to overlap with the non-pie part or initrd */
 		if (random_addr < 0x141000 + img_len)
 			continue;
+
+		remaining_space = PLATFORM_MAX_MEM_ADDR - random_addr;
 		if (remaining_space > img_len)
 			break;
 	}
@@ -329,6 +334,7 @@ void _libkvmplat_entry(void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
 	struct ukplat_memregion_desc img;
+
 
 	_init_cpufeatures();
 	_libkvmplat_init_console();
