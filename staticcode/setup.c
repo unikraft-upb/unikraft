@@ -335,7 +335,6 @@ void _libkvmplat_entry(void *arg)
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
 	struct ukplat_memregion_desc img;
 
-
 	_init_cpufeatures();
 	_libkvmplat_init_console();
 
@@ -394,7 +393,4 @@ void _libkvmplat_entry(void *arg)
 	uk_pr_info("Entry point at %p\n", prog->entry);
 	void (*elf_entry)(void *) = (void (*)(void *))prog->entry;
 	elf_entry(arg);
-
-	ukplat_terminate(UKPLAT_HALT);
 }
-
