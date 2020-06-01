@@ -33,18 +33,6 @@
 
 ELFTC_VCSID("$Id: gelf_phdr.c 3177 2015-03-30 18:19:41Z emaste $");
 
-Elf32_Phdr *
-elf32_getphdr(Elf *e)
-{
-	return (_libelf_getphdr(e, ELFCLASS32));
-}
-
-Elf64_Phdr *
-elf64_getphdr(Elf *e)
-{
-	return (_libelf_getphdr(e, ELFCLASS64));
-}
-
 GElf_Phdr *
 gelf_getphdr(Elf *e, int index, GElf_Phdr *d)
 {
@@ -98,80 +86,4 @@ gelf_getphdr(Elf *e, int index, GElf_Phdr *d)
 	}
 
 	return (d);
-}
-
-Elf32_Phdr *
-elf32_newphdr(Elf *e, size_t count)
-{
-	return (_libelf_newphdr(e, ELFCLASS32, count));
-}
-
-Elf64_Phdr *
-elf64_newphdr(Elf *e, size_t count)
-{
-	return (_libelf_newphdr(e, ELFCLASS64, count));
-}
-
-void *
-gelf_newphdr(Elf *e, size_t count)
-{
-	if (e == NULL) {
-		LIBELF_SET_ERROR(ARGUMENT, 0);
-		return (NULL);
-	}
-	return (_libelf_newphdr(e, e->e_class, count));
-}
-
-int
-gelf_update_phdr(Elf *e, int ndx, GElf_Phdr *s)
-{
-	int ec, phnum;
-	void *ehdr;
-	Elf32_Phdr *ph32;
-	Elf64_Phdr *ph64;
-
-	if (s == NULL || e == NULL || e->e_kind != ELF_K_ELF ||
-	    ((ec = e->e_class) != ELFCLASS32 && ec != ELFCLASS64)) {
-		LIBELF_SET_ERROR(ARGUMENT, 0);
-		return (0);
-	}
-
-	if (e->e_cmd == ELF_C_READ) {
-		LIBELF_SET_ERROR(MODE, 0);
-		return (0);
-	}
-
-	if ((ehdr = _libelf_ehdr(e, ec, 0)) == NULL)
-		return (0);
-
-	if (ec == ELFCLASS32)
-		phnum = ((Elf32_Ehdr *) ehdr)->e_phnum;
-	else
-		phnum = ((Elf64_Ehdr *) ehdr)->e_phnum;
-
-	if (ndx < 0 || ndx > phnum) {
-		LIBELF_SET_ERROR(ARGUMENT, 0);
-		return (0);
-	}
-
-	(void) elf_flagphdr(e, ELF_C_SET, ELF_F_DIRTY);
-
-	if (ec == ELFCLASS64) {
-		ph64 = e->e_u.e_elf.e_phdr.e_phdr64 + ndx;
-		*ph64 = *s;
-		return (1);
-	}
-
-	ph32 = e->e_u.e_elf.e_phdr.e_phdr32 + ndx;
-
-	ph32->p_type     =  s->p_type;
-	ph32->p_flags    =  s->p_flags;
-	LIBELF_COPY_U32(ph32, s, p_offset);
-	LIBELF_COPY_U32(ph32, s, p_vaddr);
-	LIBELF_COPY_U32(ph32, s, p_paddr);
-	LIBELF_COPY_U32(ph32, s, p_filesz);
-	LIBELF_COPY_U32(ph32, s, p_memsz);
-	LIBELF_COPY_U32(ph32, s, p_align);
-
-	return (1);
 }

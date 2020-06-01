@@ -39,7 +39,7 @@ final_link:
 	objcopy -w -G kvmos_* -G _libkvmplat_entry static_kernel.ld.o static_kernel.o \
 
 	gcc  -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none  -no-pie  -Wl,-m,elf_x86_64 -Wl,-dT,link64.lds \
-	-Wl,-T,ukdebug/extra.ld -Wl,-T,vfscore/extra.ld  static_kernel.o -o static_kernel.dbg \
+	static_kernel.o -o static_kernel.dbg
 
 cpu_features:
 	gcc $(INCLUDES) \

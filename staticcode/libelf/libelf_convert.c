@@ -253,7 +253,7 @@ _libelf_cvt_ADDR32_tom(unsigned char *dst, size_t dsz, unsigned char *src,
 
 	return (1);
 }
-	 
+
 static int
 _libelf_cvt_ADDR64_tof(unsigned char *dst, size_t dsz, unsigned char *src,
     size_t count, int byteswap)
@@ -2672,7 +2672,7 @@ _libelf_cvt_VNEED32_tom(unsigned char *dst, size_t dsz, unsigned char *src,
 
 	return (1);
 }
-   
+
 static int
 _libelf_cvt_VNEED64_tof(unsigned char *dst, size_t dsz, unsigned char *src,
     size_t count, int byteswap)
