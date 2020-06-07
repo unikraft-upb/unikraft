@@ -161,11 +161,11 @@ static inline void uk_printk(int lvl __unused, const char *fmt __unused, ...)
  * Convenience wrapper for uk_printk() and uk_printd()
  * This is similar to the pr_* variants that you find in the Linux kernel
  */
-#define uk_pr_debug(fmt, ...) printf((fmt), ##__VA_ARGS__)
-#define uk_pr_info(fmt, ...)  printf((fmt), ##__VA_ARGS__)
-#define uk_pr_warn(fmt, ...)  printf((fmt), ##__VA_ARGS__)
-#define uk_pr_err(fmt, ...)   printf((fmt), ##__VA_ARGS__)
-#define uk_pr_crit(fmt, ...)  printf((fmt), ##__VA_ARGS__)
+#define uk_pr_debug(fmt, ...) uk_printd((fmt), ##__VA_ARGS__)
+#define uk_pr_info(fmt, ...)  uk_printk(KLVL_INFO,  (fmt), ##__VA_ARGS__)
+#define uk_pr_warn(fmt, ...)  uk_printk(KLVL_WARN,  (fmt), ##__VA_ARGS__)
+#define uk_pr_err(fmt, ...)   uk_printk(KLVL_ERR,   (fmt), ##__VA_ARGS__)
+#define uk_pr_crit(fmt, ...)  uk_printk(KLVL_CRIT,  (fmt), ##__VA_ARGS__)
 
 /* NOTE: borrowed from OSv */
 #define WARN_STUBBED_ONCE(thing) do { \

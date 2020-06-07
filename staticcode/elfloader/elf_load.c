@@ -19,6 +19,10 @@ struct elf_prog *load_elf(struct uk_alloc *a, void *img_base, size_t img_len,
 	size_t phnum, phi;
 	uintptr_t prog_lowerl;
 	uintptr_t prog_upperl;
+	GElf_Shdr *shdr;
+	Elf64_Rela *retab;
+	Elf64_Rela *retab_end;
+	Elf64_Rela *p;
 
 	elf = elf_memory(img_base, img_len);
 	if (!elf) {
@@ -154,6 +158,30 @@ struct elf_prog *load_elf(struct uk_alloc *a, void *img_base, size_t img_len,
 		uk_pr_debug("%s: \\_ base: pie + 0x%"PRIx64" (len: 0x%"PRIx64")\n",
 			    progname, prog_lowerl, prog_upperl - prog_lowerl);
 	}
+
+	/* solve dynamic relocations */
+	shdr = (Elf64_Shdr *)(img_base + ehdr.e_shoff);
+    for (int i = 0; i < ehdr.e_shnum; i++)
+    {
+		if (shdr[i].sh_type == SHT_RELA) {
+			retab = (Elf64_Rela *)(img_base + shdr[i].sh_offset);
+			retab_end = (Elf64_Rela *)((char *)retab + shdr[i].sh_size);
+			break;
+		}
+    }
+
+	p = retab;
+
+	while(p<retab_end)
+    {
+		if (p->r_offset == 0)
+			break;
+
+		int *to_modify = (void *)(p->r_offset) + 0x138000;
+		*to_modify = p->r_addend + elf_load_address;
+
+        p++;
+    }
 
 	/*
 	 * At this point we are done with checking the image.
