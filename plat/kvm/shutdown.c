@@ -27,11 +27,46 @@
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
 
+#if CONFIG_OPTIMIZE_PGO_GENERATE
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
+
+#define GCOV_GENERATED_DIR	"/gcov_profiling"
+#define GCOV_PREFIX_STRIP_LENGTH	"100"
+
+void set_path_gcov_files()
+{
+	const char *gcov_prefix;
+	const char *gcov_strip;
+
+	gcov_prefix = getenv("GCOV_PREFIX");
+	if (!gcov_prefix)
+		setenv("GCOV_PREFIX", GCOV_GENERATED_DIR, 1);
+
+	gcov_strip = getenv("GCOV_PREFIX_STRIP");
+	if (!gcov_strip)
+		setenv("GCOV_PREFIX_STRIP", GCOV_PREFIX_STRIP_LENGTH, 1);
+
+	DIR* dir = opendir(GCOV_GENERATED_DIR);
+	if (dir)
+		closedir(dir);
+	else if (ENOENT == errno)
+		mkdir(GCOV_GENERATED_DIR, 0777);
+}
+#endif
+
 static void cpu_halt(void) __noreturn;
 
 /* TODO: implement CPU reset */
 void ukplat_terminate(enum ukplat_gstate request __unused)
 {
+
+#if CONFIG_OPTIMIZE_PGO_GENERATE
+	set_path_gcov_files();
+	__gcov_exit();
+#endif
+
 	uk_pr_info("Unikraft halted\n");
 
 	/* Try to make system off */
