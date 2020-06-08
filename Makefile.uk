@@ -37,6 +37,14 @@ COMPFLAGS-$(CONFIG_OPTIMIZE_LTO)          += -flto
 LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO)         += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y)
 LDFLAGS-$(CONFIG_OPTIMIZE_LTO)            += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y)
 
+# PGO - profile-generate phase - requires the -fprofile-generate flag
+# when compiling the application and linking all libraries in the system.
+LDFLAGS-$(CONFIG_OPTIMIZE_PGO_GENERATE)   += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y) -fprofile-generate
+
+# PGO - profile-use phase - requires the -fprofile-use flag
+# when compiling the application and linking all libraries in the system.
+LDFLAGS-$(CONFIG_OPTIMIZE_PGO_USE)        += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y) -fprofile-use
+
 DBGFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -g0
 DBGFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL1)     += -g1
 DBGFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL2)     += -g2
