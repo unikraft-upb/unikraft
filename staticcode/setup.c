@@ -333,7 +333,9 @@ static inline int get_random_addr(int img_len)
 void _libkvmplat_entry(void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
+	struct multiboot_info *my_mi;
 	struct ukplat_memregion_desc img;
+	char *newcmdline;
 
 	_init_cpufeatures();
 	_libkvmplat_init_console();
@@ -374,6 +376,13 @@ void _libkvmplat_entry(void *arg)
 
 	initialize_allocator();
 
+	my_mi = malloc(sizeof(struct multiboot_info));
+	memcpy(my_mi, mi, sizeof(struct multiboot_info));
+	uk_pr_info("mi: %p my_mi: %p %s\n", mi->cmdline, my_mi->cmdline, cmdline);
+	newcmdline = malloc(MAX_CMDLINE_SIZE);
+	strcpy(newcmdline, cmdline);
+	my_mi->cmdline = newcmdline;
+
 	/* initialize randomizer */
 	aslr_uk_swrand_ctor();
 
@@ -392,5 +401,5 @@ void _libkvmplat_entry(void *arg)
 	/* Jump to elf entry */
 	uk_pr_info("Entry point at %p\n", prog->entry);
 	void (*elf_entry)(void *) = (void (*)(void *))prog->entry;
-	elf_entry(arg);
+	elf_entry(my_mi);
 }
