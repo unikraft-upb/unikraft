@@ -320,7 +320,7 @@ static inline int get_random_addr(int img_len)
 		if (random_addr < 0x141000 + img_len)
 			continue;
 
-		remaining_space = PLATFORM_MAX_MEM_ADDR - random_addr;
+		remaining_space = max_address - random_addr;
 		if (remaining_space > img_len)
 			break;
 	}
