@@ -66,6 +66,122 @@ extern unsigned long phys_mem_length;
 #endif	/* CONFIG_PARAVIRT */
 
 /**
+ * Get a free frame in the physical memory where a new mapping can be created.
+ *
+ * @param flags: specify any criteria that the frame has to meet (e.g. a 2MB
+ * frame for a large page). These are constructed by or'ing PAGE_FLAG_* flags.
+ *
+ * @return: physical address of an unused frame or PAGE_INVALID on failure.
+ */
+static inline unsigned long uk_get_next_free_frame(unsigned long flags)
+{
+	unsigned long offset;
+	unsigned long pfn;
+	unsigned long frame_size;
+
+#ifdef CONFIG_PARAVIRT
+	/*
+	 * Large/Huge pages are not supported in PV guests on Xen.
+	 * https://wiki.xenproject.org/wiki/Huge_Page_Support
+	 */
+	if (flags & PAGE_FLAG_LARGE) {
+		uk_pr_err("Large pages are not supported on PV guest\n");
+		return PAGE_INVALID;
+	}
+#endif /* CONFIG_PARAVIRT */
+
+	if (flags & PAGE_FLAG_LARGE)
+		frame_size = PAGE_LARGE_SIZE / PAGE_SIZE;
+	else
+		frame_size = 1;
+
+	offset = uk_bitmap_find_next_zero_area(
+			(unsigned long *) phys_bitmap_start_addr,
+			phys_bitmap_length,
+			0 /* start */,
+			frame_size /* nr */,
+			frame_size - 1 /* align_mask */);
+
+	if (offset * PAGE_SIZE > phys_mem_length) {
+		uk_pr_err("Out of physical memory\n");
+		return PAGE_INVALID;
+	}
+
+	uk_bitmap_set((unsigned long *) phys_bitmap_start_addr, offset,
+		      frame_size);
+
+	pfn = (phys_mem_start_addr >> PAGE_SHIFT) + offset;
+
+	return pfn_to_frame(pfn);
+}
+
+/**
+ * Create a mapping from a virtual address to a physical address, with given
+ * protections and flags.
+ *
+ * @param vaddr: the virtual address of the page that is to be mapped.
+ * @param paddr: the physical address of the frame to which the virtual page
+ * is mapped to. This parameter can be equal to PAGE_PADDR_ANY when the caller
+ * is not interested in the physical address where the mapping is created.
+ * @param prot: protection permissions of the page (obtained by or'ing
+ * PAGE_PROT_* flags).
+ * @param flags: flags of the page (obtained by or'ing PAGE_FLAG_* flags).
+ *
+ * @return: 0 on success and -1 on failure. The uk_page_map call can fail if:
+ * - the given physical or virtual addresses are not aligned to page size;
+ * - any page in the region is already mapped to another frame;
+ * - if PAGE_PADDR_ANY flag is selected and there are no more available
+ *   free frames in the physical memory;
+ * - (on Xen PV) if flags contains PAGE_FLAG_LARGE - large pages are not
+ *   supported on PV guests;
+ * - (on Xen PV) the hypervisor rejected the mapping.
+ *
+ * In case of failure, the mapping is not created.
+ */
+int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot,
+		unsigned long flags);
+
+/**
+ * Create a mapping from a region starting at a virtual address to a physical
+ * address, with given protections and flags.
+ *
+ * @param vaddr: the virtual address of the page where the region that is to be
+ * mapped starts.
+ * @param paddr: the physical address of the starting frame of the region to
+ * which the virtual region is mapped to. This parameter can be equal to
+ * PAGE_PADDR_ANY when the caller is not interested in the physical address
+ * where the mappings are created.
+ * @param prot: protection permissions of the pages (obtained by or'ing
+ * PAGE_PROT_* flags).
+ * @param flags: flags of the page (obtained by or'ing PAGE_FLAG_* flags).
+ *
+ * @return: 0 on success and -1 on failure. The uk_page_map call can fail if:
+ * - the given physical or virtual addresses are not aligned to page size;
+ * - any page in the region is already mapped to another frame;
+ * - if PAGE_PADDR_ANY flag is selected and there are no more available
+ *   free frames in the physical memory;
+ * - (on Xen PV) if flags contains PAGE_FLAG_LARGE - large pages are not
+ *   supported on PV guests;
+ * - (on Xen PV) the hypervisor rejected any of the mappings.
+ *
+ * In case of failure, no new mapping is created.
+ */
+int uk_map_region(unsigned long vaddr, unsigned long paddr,
+		unsigned long pages, unsigned long prot, unsigned long flags);
+
+/**
+ * Frees a mapping for a page.
+ *
+ * @param vaddr: the virtual address of the page that is to be unmapped.
+ *
+ * @return: 0 in case of success and -1 on failure. The call fails if:
+ * - the given page is not mapped to any frame;
+ * - the virtual address given is not aligned to page (simple/large/huge) size.
+ * - (on Xen PV) the hypervisor rejected the unmapping.
+ */
+int uk_page_unmap(unsigned long vaddr);
+
+/**
  * Return page table entry corresponding to given virtual address.
  * @param vaddr: the virtual address, aligned to the corresponding page
  * dimesion (simple, large or huge) size.
@@ -86,5 +202,4 @@ void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 		unsigned long len);
 
 #endif /* __UKPLAT_MM__ */
-
 

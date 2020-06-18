@@ -55,6 +55,320 @@ static unsigned long pt_mem_length;
 
 static size_t _used_pts;
 
+/**
+ * Allocate a page table for a given level (in the PT hierarchy).
+ *
+ * @param level: the level of the needed page table.
+ *
+ * @return: virtual address of newly allocated page table or PAGE_INVALID
+ * on failure.
+ */
+static unsigned long uk_pt_alloc_table(size_t level)
+{
+	unsigned long offset, pt_vaddr;
+	int rc;
+
+	offset = uk_bitmap_find_next_zero_area(
+			(unsigned long *) pt_bitmap_start_addr,
+			pt_bitmap_length,
+			0 /* start */, 1 /* nr */, 0 /* align_mask */);
+
+	if (offset * PAGE_SIZE > pt_mem_length) {
+		uk_pr_err("Filled up all available space for page tables\n");
+		return PAGE_INVALID;
+	}
+
+	uk_bitmap_set((unsigned long *) pt_bitmap_start_addr, offset, 1);
+	pt_vaddr = pt_mem_start_addr + (offset << PAGE_SHIFT) + _virt_offset;
+
+#ifdef CONFIG_PARAVIRT
+	rc = uk_page_set_prot(pt_vaddr, PAGE_PROT_READ | PAGE_PROT_WRITE);
+	if (rc)
+		return PAGE_INVALID;
+#endif	/* CONFIG_PARAVIRT */
+
+	memset((void *) pt_vaddr, 0,
+	       sizeof(unsigned long) * pagetable_entries[level - 1]);
+
+	/* Xen requires that PTs are mapped read-only */
+#ifdef CONFIG_PARAVIRT
+	/*
+	 * TODO: when using this function on Xen for the initmem part, the page
+	 * must not be set to read-only, as we are currently writing
+	 * directly into it. All page tables will be set later to read-only
+	 * before setting the new pt_base.
+	 */
+	rc = uk_page_set_prot(pt_vaddr, PAGE_PROT_READ);
+	if (rc)
+		return PAGE_INVALID;
+#endif	/* CONFIG_PARAVIRT */
+
+	/*
+	 * This is an L(n + 1) entry, so we set L(n + 1) flags
+	 * (Index in pagetable_protections is level of PT - 1)
+	 */
+	return (virt_to_mfn(pt_vaddr) << PAGE_SHIFT)
+		| pagetable_protections[level];
+}
+
+static int uk_pt_release_if_unused(unsigned long vaddr, unsigned long pt,
+		unsigned long parent_pt, size_t level)
+{
+	unsigned long offset;
+	size_t i;
+	int rc;
+
+	if (!PAGE_ALIGNED(pt) || !PAGE_ALIGNED(parent_pt)) {
+		uk_pr_err("Table's address must be aligned to page size\n");
+		return -1;
+	}
+
+	for (i = 0; i < pagetable_entries[level - 1]; i++) {
+		if (PAGE_PRESENT(ukarch_pte_read(pt, i, level)))
+			return 0;
+	}
+
+	rc = ukarch_pte_write(parent_pt, Lx_OFFSET(vaddr, level + 1), 0,
+				level + 1);
+	if (rc)
+		return -1;
+
+	ukarch_flush_tlb_entry(parent_pt);
+
+	offset = (pt - pt_mem_start_addr - _virt_offset) >> PAGE_SHIFT;
+	uk_bitmap_clear((unsigned long *) pt_bitmap_start_addr, offset, 1);
+
+	return 0;
+}
+
+static int _page_map(unsigned long pt, unsigned long vaddr, unsigned long paddr,
+	      unsigned long prot, unsigned long flags,
+	      int (*pte_write)(unsigned long, size_t, unsigned long, size_t))
+{
+	unsigned long pte;
+	int rc;
+
+	if (!PAGE_ALIGNED(vaddr)) {
+		uk_pr_err("Virt address must be aligned to page size\n");
+		return -1;
+	}
+	if (flags & PAGE_FLAG_LARGE && !PAGE_LARGE_ALIGNED(vaddr)) {
+		uk_pr_err("Virt ddress must be aligned to large page size\n");
+		return -1;
+	}
+
+#ifdef CONFIG_PARAVIRT
+	if (flags & PAGE_FLAG_LARGE) {
+		uk_pr_err("Large pages are not supported on PV guest\n");
+		return -1;
+	}
+#endif /* CONFIG_PARAVIRT */
+
+	if (paddr == PAGE_PADDR_ANY) {
+		paddr = uk_get_next_free_frame(flags);
+		if (paddr == PAGE_INVALID)
+			return -1;
+	} else if (!PAGE_ALIGNED(paddr)) {
+		uk_pr_err("Phys address must be aligned to page size\n");
+		return -1;
+	} else if ((flags & PAGE_FLAG_LARGE) && !PAGE_LARGE_ALIGNED(paddr)) {
+		uk_pr_err("Phys address must be aligned to large page size\n");
+		return -1;
+	}
+
+	/*
+	 * XXX: On 64-bits architectures (x86_64 and arm64) the hierarchical
+	 * page tables have a 4 level layout. This implementation will need a
+	 * revision when introducing support for 32-bits architectures, since
+	 * there are only 3 levels of page tables.
+	 */
+	pte = ukarch_pte_read(pt, L4_OFFSET(vaddr), 4);
+	if (!PAGE_PRESENT(pte)) {
+		pte = uk_pt_alloc_table(3);
+		if (pte == PAGE_INVALID)
+			return -1;
+
+		rc = pte_write(pt, L4_OFFSET(vaddr), pte, 4);
+		if (rc)
+			return -1;
+	}
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(pt, L3_OFFSET(vaddr), 3);
+	if (!PAGE_PRESENT(pte)) {
+		pte = uk_pt_alloc_table(2);
+		if (pte == PAGE_INVALID)
+			return -1;
+
+		rc = pte_write(pt, L3_OFFSET(vaddr), pte, 3);
+		if (rc)
+			return -1;
+	}
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(pt, L2_OFFSET(vaddr), 2);
+	if (flags & PAGE_FLAG_LARGE) {
+		if (PAGE_PRESENT(pte))
+			return -1;
+
+		pte = ukarch_pte_create(PTE_REMOVE_FLAGS(paddr), prot, 2);
+		rc = pte_write(pt, L2_OFFSET(vaddr), pte, 2);
+		if (rc)
+			return -1;
+
+		return 0;
+	}
+	if (!PAGE_PRESENT(pte)) {
+		pte = uk_pt_alloc_table(1);
+		if (pte == PAGE_INVALID)
+			return -1;
+
+		rc = pte_write(pt, L2_OFFSET(vaddr), pte, 2);
+		if (rc)
+			return -1;
+	}
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(pt, L1_OFFSET(vaddr), 1);
+	if (!PAGE_PRESENT(pte)) {
+		pte = ukarch_pte_create(PTE_REMOVE_FLAGS(paddr), prot, 1);
+		rc = pte_write(pt, L1_OFFSET(vaddr), pte, 1);
+		if (rc)
+			return -1;
+	} else {
+		uk_pr_info("Virtual address 0x%08lx is already mapped\n",
+				vaddr);
+		return -1;
+	}
+
+	return 0;
+}
+
+int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot,
+		unsigned long flags)
+{
+	return _page_map(ukarch_read_pt_base(), vaddr, paddr, prot, flags,
+			 ukarch_pte_write);
+}
+
+static int _page_unmap(unsigned long pt, unsigned long vaddr,
+		int (*pte_write)(unsigned long, size_t, unsigned long, size_t))
+{
+	unsigned long l1_table, l2_table, l3_table, l4_table, pte;
+	unsigned long offset, pfn;
+	unsigned long frame_size = 1;
+	int rc;
+
+	if (!PAGE_ALIGNED(vaddr)) {
+		uk_pr_err("Address must be aligned to page size\n");
+		return -1;
+	}
+
+	l4_table = pt;
+	pte = ukarch_pte_read(l4_table, L4_OFFSET(vaddr), 4);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	l3_table = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(l3_table, L3_OFFSET(vaddr), 3);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	l2_table = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(l2_table, L2_OFFSET(vaddr), 2);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+	if (PAGE_LARGE(pte)) {
+		if (!PAGE_LARGE_ALIGNED(vaddr))
+			return -1;
+
+		pfn = pte_to_pfn(pte);
+		rc = pte_write(l2_table, L2_OFFSET(vaddr), 0, 2);
+		if (rc)
+			return -1;
+		frame_size = PAGE_LARGE_SIZE / PAGE_SIZE;
+	} else {
+		l1_table = (unsigned long) pte_to_virt(pte);
+		pte = ukarch_pte_read(l1_table, L1_OFFSET(vaddr), 1);
+		if (!PAGE_PRESENT(pte))
+			return -1;
+
+		pfn = pte_to_pfn(pte);
+		rc = pte_write(l1_table, L1_OFFSET(vaddr), 0, 1);
+		if (rc)
+			return -1;
+		rc = uk_pt_release_if_unused(vaddr, l1_table, l2_table, 1);
+		if (rc)
+			return -1;
+	}
+
+	ukarch_flush_tlb_entry(vaddr);
+
+	offset = pfn - (phys_mem_start_addr >> PAGE_SHIFT);
+	uk_bitmap_clear((unsigned long *) phys_bitmap_start_addr,
+			offset, frame_size);
+
+	rc = uk_pt_release_if_unused(vaddr, l2_table, l3_table, 2);
+	if (rc)
+		return -1;
+	rc = uk_pt_release_if_unused(vaddr, l3_table, l4_table, 3);
+	if (rc)
+		return -1;
+
+	return 0;
+}
+
+int uk_page_unmap(unsigned long vaddr)
+{
+	return _page_unmap(ukarch_read_pt_base(), vaddr, ukarch_pte_write);
+}
+
+static int _map_region(unsigned long pt, unsigned long vaddr,
+		unsigned long paddr, unsigned long pages, unsigned long prot,
+		unsigned long flags,
+		int (*pte_write)(unsigned long, size_t, unsigned long, size_t))
+{
+	size_t i;
+	unsigned long increment;
+	int rc;
+
+	if (flags & PAGE_FLAG_LARGE)
+		increment = PAGE_LARGE_SIZE;
+	else
+		increment = PAGE_SIZE;
+
+	for (i = 0; i < pages; i++) {
+		unsigned long current_paddr;
+
+		if (paddr == PAGE_PADDR_ANY)
+			current_paddr = PAGE_PADDR_ANY;
+		else
+			current_paddr = paddr + i * increment;
+
+		rc = _page_map(pt, vaddr + i * increment,
+				current_paddr, prot, flags, pte_write);
+		if (rc) {
+			size_t j;
+
+			uk_pr_err("Could not map page 0x%08lx\n",
+					vaddr + i * increment);
+
+			for (j = 0; j < i; j++)
+				_page_unmap(pt, vaddr, pte_write);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+int uk_map_region(unsigned long vaddr, unsigned long paddr,
+		unsigned long pages, unsigned long prot, unsigned long flags)
+{
+	return _map_region(ukarch_read_pt_base(), vaddr, paddr, pages,
+			prot, flags, ukarch_pte_write);
+}
+
 unsigned long uk_virt_to_pte(unsigned long vaddr)
 {
 	unsigned long pt, pt_entry;
