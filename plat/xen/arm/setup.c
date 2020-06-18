@@ -25,7 +25,7 @@
 /* Ported from Mini-OS */
 
 #include <string.h>
-#include <uk/plat/common/sections.h>
+#include <uk/sections.h>
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <xen/xen.h>

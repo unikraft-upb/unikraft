@@ -28,7 +28,7 @@
 #define _ARCH_MM_H_
 
 #include <stdint.h>
-#include <uk/plat/common/sections.h>
+#include <uk/sections.h>
 #include <uk/arch/limits.h>
 
 typedef uint64_t paddr_t;

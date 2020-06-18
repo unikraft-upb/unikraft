@@ -36,7 +36,7 @@
  */
 
 #include <string.h>
-#include <uk/plat/common/sections.h>
+#include <uk/sections.h>
 #include <errno.h>
 #include <uk/alloc.h>
 #include <uk/plat/config.h>
@@ -604,7 +604,7 @@ void _init_mem_set_readonly(void *text, void *etext)
         page = tab[offset];
         mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
-        offset = l2_table_offset(start_address);        
+        offset = l2_table_offset(start_address);
         if ( !(tab[offset] & _PAGE_PSE) )
         {
             page = tab[offset];
@@ -617,7 +617,7 @@ void _init_mem_set_readonly(void *text, void *etext)
         if ( start_address != (unsigned long)&_libxenplat_shared_info )
         {
 #ifdef CONFIG_PARAVIRT
-            mmu_updates[count].ptr = 
+            mmu_updates[count].ptr =
                 ((pgentry_t)mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
             mmu_updates[count].val = tab[offset] & ~_PAGE_RW;
             count++;
@@ -631,7 +631,7 @@ void _init_mem_set_readonly(void *text, void *etext)
         start_address += page_size;
 
 #ifdef CONFIG_PARAVIRT
-        if ( count == L1_PAGETABLE_ENTRIES || 
+        if ( count == L1_PAGETABLE_ENTRIES ||
              start_address + page_size > end_address )
         {
             rc = HYPERVISOR_mmu_update(mmu_updates, count, NULL, DOMID_SELF);
