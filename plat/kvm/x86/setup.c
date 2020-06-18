@@ -36,10 +36,15 @@
 #include <kvm-x86/multiboot.h>
 #include <kvm-x86/multiboot_defs.h>
 #include <uk/arch/limits.h>
+#include <uk/mem_layout.h>
 #include <uk/arch/types.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+
+#if CONFIG_PT_API
+#include <uk/plat/mm.h>
+#endif /* CONFIG_PT_API */
 
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
@@ -96,8 +101,10 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	 * page tables for.
 	 */
 	max_addr = m->addr + m->len;
+#ifndef CONFIG_DYNAMIC_PT
 	if (max_addr > PLATFORM_MAX_MEM_ADDR)
 		max_addr = PLATFORM_MAX_MEM_ADDR;
+#endif /* CONFIG_DYNAMIC_PT */
 	UK_ASSERT((size_t) __END <= max_addr);
 
 	/*
@@ -106,13 +113,44 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	if ((max_addr - m->addr) < __STACK_SIZE)
 		UK_CRASH("Not enough memory to allocate boot stack\n");
 
+#if CONFIG_DYNAMIC_PT
+	_libkvmplat_cfg.heap.start = HEAP_AREA_START;
+	_libkvmplat_cfg.heap.end   = HEAP_AREA_START
+				     + PAGE_LARGE_ALIGN_DOWN(
+						     m->len
+						     - STACK_AREA_SIZE
+						     - KERNEL_AREA_SIZE
+						     - PAGETABLES_AREA_SIZE);
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
+				     - _libkvmplat_cfg.heap.start;
+#if CONFIG_LIBPOSIX_MMAP
+	/* TODO: implement a way to dynamically resize the heap (e.g. brk()) */
+	_libkvmplat_cfg.heap.len /= 2;
+	_libkvmplat_cfg.heap.end = _libkvmplat_cfg.heap.start
+				   + _libkvmplat_cfg.heap.len;
+#endif /* CONFIG_LIBPOSIX_MMAP */
+	uk_pt_build(m->addr, m->len);
+
+	_libkvmplat_cfg.bstack.start = (uintptr_t) uk_stack_alloc();
+	_libkvmplat_cfg.bstack.end   = _libkvmplat_cfg.bstack.start
+					+ __STACK_SIZE;
+	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
+
+#else
 	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t) __END, __PAGE_SIZE);
+#if CONFIG_PT_API
+	uk_pt_init(_libkvmplat_cfg.heap.start, PLATFORM_MAX_MEM_ADDR,
+		   m->addr + m->len - max_addr);
+
+	_libkvmplat_cfg.heap.start += PAGETABLES_AREA_SIZE;
+#endif /* CONFIG_PT_API */
 	_libkvmplat_cfg.heap.end   = (uintptr_t) max_addr - __STACK_SIZE;
 	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
 				     - _libkvmplat_cfg.heap.start;
 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
 	_libkvmplat_cfg.bstack.end   = max_addr;
 	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
+#endif /* CONFIG_DYNAMIC_PT */
 }
 
 static inline void _mb_init_initrd(struct multiboot_info *mi)
