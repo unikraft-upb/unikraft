@@ -215,5 +215,17 @@ unsigned long uk_virt_to_pte(unsigned long vaddr);
 void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 		unsigned long len);
 
-#endif /* __UKPLAT_MM__ */
+/**
+ * Build page table structure from scratch
+ * @param paddr_start: the first address in the usable physical memory.
+ * @param len: the length (in bytes) of the physical memory that will be
+ * managed by the API.
+ *
+ * This function builds a structure of page tables (by calling _pt_create),
+ * initializes the page table API (by calling uk_pt_init), maps the kernel in
+ * the virtual address space (with _mmap_kernel), switches to the new address
+ * space and sets the _virt_offset variable.
+ */
+void uk_pt_build(unsigned long paddr_start, unsigned long len);
 
+#endif /* __UKPLAT_MM__ */

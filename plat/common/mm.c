@@ -53,7 +53,13 @@ static unsigned long pt_bitmap_length;
 static unsigned long pt_mem_start_addr;
 static unsigned long pt_mem_length;
 
-static size_t _used_pts;
+/*
+ * Variable used in the initialization phase during booting when allocating
+ * page tables does not use the page table API function uk_pt_alloc_table.
+ * The initial page tables are allocated sequantially and this variable is the
+ * counter of used page tables.
+ */
+static size_t _used_pts_count;
 
 /**
  * Allocate a page table for a given level (in the PT hierarchy).
@@ -244,6 +250,13 @@ static int _page_map(unsigned long pt, unsigned long vaddr, unsigned long paddr,
 	return 0;
 }
 
+int _initmem_page_map(unsigned long pt, unsigned long vaddr,
+		      unsigned long paddr, unsigned long prot,
+		      unsigned long flags)
+{
+	return _page_map(pt, vaddr, paddr, prot, flags, _ukarch_pte_write_raw);
+}
+
 int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot,
 		unsigned long flags)
 {
@@ -369,6 +382,14 @@ int uk_map_region(unsigned long vaddr, unsigned long paddr,
 			prot, flags, ukarch_pte_write);
 }
 
+int _initmem_map_region(unsigned long pt, unsigned long vaddr,
+		unsigned long paddr, unsigned long pages, unsigned long prot,
+		unsigned long flags)
+{
+	return _map_region(pt, vaddr, paddr, pages, prot, flags,
+			_ukarch_pte_write_raw);
+}
+
 int _page_set_prot(unsigned long pt, unsigned long vaddr,
 		unsigned long new_prot,
 		int (*pte_write)(unsigned long, size_t, unsigned long, size_t))
@@ -464,6 +485,71 @@ unsigned long uk_virt_to_pte(unsigned long vaddr)
 	return pt_entry;
 }
 
+static unsigned long _initmem_pt_get(void)
+{
+	return PAGETABLES_AREA_START
+	       - PAGETABLES_VIRT_OFFSET
+	       + (_used_pts_count++) * PAGE_SIZE;
+}
+
+/**
+ * Create page tables that have mappings for themselves. Any other mappings
+ * can be then created using the API, after the value returned by this function
+ * is set as the PT base.
+ * @return PT base, the physical address of the 4th level page table.
+ */
+static unsigned long _pt_create(void)
+{
+	unsigned long pt_l4, pt_l3, pt_l2, pt_l1;
+	unsigned long prev_l4_offset, prev_l3_offset, prev_l2_offset;
+	unsigned long page, frame;
+
+	pt_l4 = _initmem_pt_get();
+	pt_l3 = _initmem_pt_get();
+	pt_l2 = _initmem_pt_get();
+	pt_l1 = _initmem_pt_get();
+
+	prev_l4_offset = L4_OFFSET(PAGETABLES_AREA_START);
+	prev_l3_offset = L3_OFFSET(PAGETABLES_AREA_START);
+	prev_l2_offset = L2_OFFSET(PAGETABLES_AREA_START);
+
+	_ukarch_pte_write_raw(pt_l4, prev_l4_offset, pt_l3 | L4_PROT, 4);
+	_ukarch_pte_write_raw(pt_l3, prev_l3_offset, pt_l2 | L3_PROT, 3);
+	_ukarch_pte_write_raw(pt_l2, prev_l2_offset, pt_l1 | L2_PROT, 2);
+
+	for (page = PAGETABLES_AREA_START;
+			page < PAGETABLES_AREA_START + PAGETABLES_AREA_SIZE;
+			page += PAGE_SIZE) {
+		frame = page - PAGETABLES_VIRT_OFFSET;
+
+		if (L4_OFFSET(page) != prev_l4_offset) {
+			pt_l3 = _initmem_pt_get();
+			_ukarch_pte_write_raw(pt_l4, L4_OFFSET(page),
+					   pt_l3 | L4_PROT, 4);
+			prev_l4_offset = L4_OFFSET(page);
+		}
+
+		if (L3_OFFSET(page) != prev_l3_offset) {
+			pt_l2 = _initmem_pt_get();
+			_ukarch_pte_write_raw(pt_l3, L3_OFFSET(page),
+					   pt_l2 | L3_PROT, 3);
+			prev_l3_offset = L3_OFFSET(page);
+		}
+
+		if (L2_OFFSET(page) != prev_l2_offset) {
+			pt_l1 = _initmem_pt_get();
+			_ukarch_pte_write_raw(pt_l2, L2_OFFSET(page),
+					   pt_l1 | L2_PROT, 2);
+			prev_l2_offset = L2_OFFSET(page);
+		}
+
+		_ukarch_pte_write_raw(pt_l1, L1_OFFSET(page),
+				frame | L1_PROT, 1);
+	}
+
+	return pt_l4;
+}
+
 void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 		unsigned long len)
 {
@@ -490,7 +576,7 @@ void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 	 * translation to machine frames being done later.
 	 */
 	phys_bitmap_start_addr = pt_area_start
-				 + _used_pts * PAGE_SIZE
+				 + _used_pts_count * PAGE_SIZE
 				 - PAGETABLES_VIRT_OFFSET;
 	phys_bitmap_length = phys_mem_length >> PAGE_SHIFT;
 	uk_bitmap_zero((unsigned long *) phys_bitmap_start_addr,
@@ -500,7 +586,7 @@ void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 		PAGE_ALIGN_UP(phys_bitmap_start_addr + phys_bitmap_length);
 	pt_mem_length = ((PAGETABLES_AREA_SIZE
 			  - phys_bitmap_length
-			  - _used_pts * PAGE_SIZE)
+			  - _used_pts_count * PAGE_SIZE)
 			 * PAGE_SIZE / (PAGE_SIZE + 1));
 	pt_mem_length = PAGE_ALIGN_DOWN(pt_mem_length);
 
@@ -523,3 +609,77 @@ void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 	}
 }
 
+#ifdef CONFIG_PLAT_KVM
+static int _mmap_kvm_areas(unsigned long pt_base)
+{
+	unsigned long mbinfo_pages, vgabuffer_pages;
+
+	mbinfo_pages = DIV_ROUND_UP(MBINFO_AREA_SIZE, PAGE_SIZE);
+	vgabuffer_pages = DIV_ROUND_UP(VGABUFFER_AREA_SIZE, PAGE_SIZE);
+	if (_initmem_map_region(pt_base, MBINFO_AREA_START, MBINFO_AREA_START,
+			mbinfo_pages, PAGE_PROT_READ, 0))
+		return -1;
+
+	if (_initmem_map_region(pt_base, VGABUFFER_AREA_START,
+			VGABUFFER_AREA_START, vgabuffer_pages,
+			PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+		return -1;
+
+	return 0;
+}
+#endif /* CONFIG_PLAT_KVM */
+
+static int _mmap_kernel(unsigned long pt_base,
+			unsigned long kernel_start_vaddr,
+			unsigned long kernel_start_paddr,
+			unsigned long kernel_area_size)
+{
+	unsigned long kernel_pages;
+
+	UK_ASSERT(PAGE_ALIGNED(kernel_start_vaddr));
+	UK_ASSERT(PAGE_ALIGNED(kernel_start_paddr));
+
+#ifdef CONFIG_PLAT_KVM
+	if (_mmap_kvm_areas(pt_base))
+		return -1;
+#endif /* CONFIG_PLAT_KVM */
+
+	/* TODO: break down into RW regions and RX regions */
+	kernel_pages = DIV_ROUND_UP(kernel_area_size, PAGE_SIZE);
+	if (_initmem_map_region(pt_base, kernel_start_vaddr,
+			kernel_start_paddr, kernel_pages,
+			PAGE_PROT_READ | PAGE_PROT_WRITE | PAGE_PROT_EXEC, 0))
+		return -1;
+
+	/*
+	 * It is safe to return from this function, since we are still on the
+	 * bootstrap stack, which is in the bss section, in the binary.
+	 * The switch to another stack is done later.
+	 */
+	return 0;
+}
+
+void uk_pt_build(unsigned long paddr_start, unsigned long len)
+{
+	unsigned long pt_base;
+
+	UK_ASSERT(PAGE_ALIGNED(paddr_start));
+	UK_ASSERT(PAGE_ALIGNED(len));
+
+	pt_base = _pt_create();
+	uk_pt_init(PAGETABLES_AREA_START, (unsigned long) -1, len);
+	if (_mmap_kernel(pt_base, KERNEL_AREA_START, paddr_start,
+			 KERNEL_AREA_SIZE))
+		UK_CRASH("Could not map kernel\n");
+
+#ifdef CONFIG_PARAVIRT
+	/*
+	 * TODO: Change protections of page tables to read-only before setting
+	 * the new pt base.
+	 */
+#endif
+	ukarch_write_pt_base(pt_base);
+	_virt_offset = PAGETABLES_VIRT_OFFSET;
+	phys_bitmap_start_addr += _virt_offset;
+	pt_bitmap_start_addr += _virt_offset;
+}
