@@ -182,6 +182,20 @@ int uk_map_region(unsigned long vaddr, unsigned long paddr,
 int uk_page_unmap(unsigned long vaddr);
 
 /**
+ * Sets new protections for a given page.
+ *
+ * @param vaddr: the virtual address of the page whose protections are updated.
+ * @param new_prot: new protections that will be set to the page (obtained by
+ * or'ing PAGE_PROT_* flags).
+ *
+ * @return: 0 in case of success and -1 on failure. The call fails if:
+ * - the given page is not mapped to any frame;
+ * - the virtual address given is not aligned to page (simple/large/huge) size.
+ * - (on Xen PV) the hypervisor rejected the unmapping.
+ */
+int uk_page_set_prot(unsigned long vaddr, unsigned long new_prot);
+
+/**
  * Return page table entry corresponding to given virtual address.
  * @param vaddr: the virtual address, aligned to the corresponding page
  * dimesion (simple, large or huge) size.

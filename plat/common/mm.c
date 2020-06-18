@@ -369,6 +369,67 @@ int uk_map_region(unsigned long vaddr, unsigned long paddr,
 			prot, flags, ukarch_pte_write);
 }
 
+int _page_set_prot(unsigned long pt, unsigned long vaddr,
+		unsigned long new_prot,
+		int (*pte_write)(unsigned long, size_t, unsigned long, size_t))
+{
+	unsigned long pte, new_pte;
+	int rc;
+
+	if (!PAGE_ALIGNED(vaddr)) {
+		uk_pr_info("Address must be aligned to page size\n");
+		return -1;
+	}
+
+	pte = ukarch_pte_read(pt, L4_OFFSET(vaddr), 4);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(pt, L3_OFFSET(vaddr), 3);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(pt, L2_OFFSET(vaddr), 2);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+	if (PAGE_LARGE(pte)) {
+		new_pte = ukarch_pte_create(PTE_REMOVE_FLAGS(pte), new_prot, 2);
+		rc = pte_write(pt, L2_OFFSET(vaddr), new_pte, 2);
+		if (rc)
+			return -1;
+		ukarch_flush_tlb_entry(vaddr);
+
+		return 0;
+	}
+
+	pt = (unsigned long) pte_to_virt(pte);
+	pte = ukarch_pte_read(pt, L1_OFFSET(vaddr), 1);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	new_pte = ukarch_pte_create(PTE_REMOVE_FLAGS(pte), new_prot, 1);
+	rc = pte_write(pt, L1_OFFSET(vaddr), new_pte, 1);
+	if (rc)
+		return -1;
+	ukarch_flush_tlb_entry(vaddr);
+
+	return 0;
+}
+
+int uk_page_set_prot(unsigned long vaddr, unsigned long new_prot)
+{
+	return _page_set_prot(ukarch_read_pt_base(), vaddr, new_prot,
+			ukarch_pte_write);
+}
+
+int _initmem_page_set_prot(unsigned long pt, unsigned long vaddr,
+		unsigned long new_prot)
+{
+	return _page_set_prot(pt, vaddr, new_prot, _ukarch_pte_write_raw);
+}
+
 unsigned long uk_virt_to_pte(unsigned long vaddr)
 {
 	unsigned long pt, pt_entry;
