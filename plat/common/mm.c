@@ -223,6 +223,13 @@ int _page_map(unsigned long pt, unsigned long vaddr, unsigned long paddr,
 	return 0;
 }
 
+int _initmem_page_map(unsigned long pt, unsigned long vaddr,
+		      unsigned long paddr, unsigned long prot,
+		      unsigned long flags)
+{
+	return _page_map(pt, vaddr, paddr, prot, flags, _initmem_pte_write);
+}
+
 int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot,
 		unsigned long flags)
 {
@@ -363,6 +370,82 @@ unsigned long uk_virt_to_pte(unsigned long vaddr)
 	return pt_entry;
 }
 
+static unsigned long _initmem_pt_get(void)
+{
+	return PAGETABLES_AREA_START
+	       - PAGETABLES_VIRT_OFFSET
+	       + (_used_pts++) * PAGE_SIZE;
+}
+
+static unsigned long _pt_create(unsigned long vaddr_start, unsigned long len,
+				unsigned long virt_offset)
+{
+	unsigned long pt_l4, pt_l3, pt_l2, pt_l1;
+	unsigned long prev_l4_offset, prev_l3_offset, prev_l2_offset;
+	unsigned long page, frame;
+
+	UK_ASSERT(PAGE_ALIGNED(vaddr_start));
+	UK_ASSERT(PAGE_ALIGNED(len));
+	UK_ASSERT(PAGE_ALIGNED(virt_offset));
+
+	pt_l4 = _initmem_pt_get();
+	pt_l3 = _initmem_pt_get();
+	pt_l2 = _initmem_pt_get();
+	pt_l1 = _initmem_pt_get();
+
+	prev_l4_offset = L4_OFFSET(vaddr_start);
+	prev_l3_offset = L3_OFFSET(vaddr_start);
+	prev_l2_offset = L2_OFFSET(vaddr_start);
+
+	_initmem_pte_write(pt_l4, prev_l4_offset, pt_l3 | L4_PROT, 4);
+	_initmem_pte_write(pt_l3, prev_l3_offset, pt_l2 | L3_PROT, 3);
+	_initmem_pte_write(pt_l2, prev_l2_offset, pt_l1 | L2_PROT, 2);
+
+	for (page = vaddr_start; page < vaddr_start + len; page += PAGE_SIZE) {
+		frame = page - virt_offset;
+
+		if (L2_OFFSET(page) != prev_l2_offset) {
+			pt_l1 = _initmem_pt_get();
+			_initmem_pte_write(pt_l2, L2_OFFSET(page),
+					   pt_l1 | L2_PROT, 2);
+			prev_l2_offset = L2_OFFSET(page);
+		}
+
+		if (L3_OFFSET(page) != prev_l3_offset) {
+			pt_l2 = _initmem_pt_get();
+			_initmem_pte_write(pt_l3, L3_OFFSET(page),
+					   pt_l2 | L3_PROT, 3);
+			prev_l3_offset = L3_OFFSET(page);
+
+			pt_l1 = _initmem_pt_get();
+			_initmem_pte_write(pt_l2, L2_OFFSET(page),
+					   pt_l1 | L2_PROT, 2);
+			prev_l2_offset = L2_OFFSET(page);
+		}
+
+		if (L4_OFFSET(page) != prev_l4_offset) {
+			pt_l3 = _initmem_pt_get();
+			_initmem_pte_write(pt_l4, L4_OFFSET(page),
+					   pt_l3 | L4_PROT, 4);
+			prev_l4_offset = L4_OFFSET(page);
+
+			pt_l2 = _initmem_pt_get();
+			_initmem_pte_write(pt_l3, L3_OFFSET(page),
+					   pt_l2 | L3_PROT, 3);
+			prev_l3_offset = L3_OFFSET(page);
+
+			pt_l1 = _initmem_pt_get();
+			_initmem_pte_write(pt_l2, L2_OFFSET(page),
+					   pt_l1 | L2_PROT, 2);
+			prev_l2_offset = L2_OFFSET(page);
+		}
+
+		*((unsigned long *) pt_l1 + L1_OFFSET(page)) = frame | L1_PROT;
+	}
+
+	return pt_l4;
+}
+
 void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 		unsigned long len)
 {
@@ -421,3 +504,136 @@ void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 	}
 }
 
+static int _mmap_kernel(unsigned long pt_base,
+			unsigned long kernel_start_vaddr,
+			unsigned long kernel_start_paddr,
+			unsigned long kernel_area_size)
+{
+	unsigned long kernel_pages;
+	unsigned long page, frame;
+	size_t i;
+
+	UK_ASSERT(PAGE_ALIGNED(kernel_start_vaddr));
+	UK_ASSERT(PAGE_ALIGNED(kernel_start_paddr));
+
+#ifdef CONFIG_PLAT_KVM
+	unsigned long mbinfo_pages, vgabuffer_pages;
+
+	mbinfo_pages = DIV_ROUND_UP(MBINFO_AREA_SIZE, PAGE_SIZE);
+	vgabuffer_pages = DIV_ROUND_UP(VGABUFFER_AREA_SIZE, PAGE_SIZE);
+
+	for (i = 0; i < mbinfo_pages; i++) {
+		page = MBINFO_AREA_START + i * PAGE_SIZE;
+
+		if (_initmem_page_map(pt_base, page, page, PAGE_PROT_READ, 0))
+			return -1;
+	}
+
+	for (i = 0; i < vgabuffer_pages; i++) {
+		page = VGABUFFER_AREA_START + i * PAGE_SIZE;
+
+		if (_initmem_page_map(pt_base, page, page,
+				      PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+			return -1;
+	}
+#endif /* CONFIG_PLAT_KVM */
+
+	kernel_pages = DIV_ROUND_UP(kernel_area_size, PAGE_SIZE);
+
+	for (i = 0; i < kernel_pages; i++) {
+		page = kernel_start_vaddr + i * PAGE_SIZE;
+		frame = kernel_start_paddr + i * PAGE_SIZE;
+
+		/* TODO: break down into RW regions and RX regions */
+		if (_initmem_page_map(pt_base, page, frame,
+				      PAGE_PROT_READ
+				      | PAGE_PROT_WRITE
+				      | PAGE_PROT_EXEC,
+				      0))
+			return -1;
+	}
+
+	/*
+	 * It is safe to return from this function, since we are still on the
+	 * bootstrap stack, which is in the bss section, in the binary.
+	 * The switch to another stack is done later.
+	 */
+	return 0;
+}
+
+void uk_pt_build(unsigned long heap_len, unsigned long paddr_start,
+		 unsigned long len)
+{
+	size_t i;
+	unsigned long stack_pages, heap_pages, heap_large_pages;
+	unsigned long pt_base;
+	unsigned long page;
+
+	UK_ASSERT(PAGE_ALIGNED(paddr_start));
+	UK_ASSERT(PAGE_ALIGNED(len));
+
+	pt_base = _pt_create(PAGETABLES_AREA_START, PAGETABLES_AREA_SIZE,
+			     PAGETABLES_VIRT_OFFSET);
+	uk_pt_init(PAGETABLES_AREA_START, (unsigned long) -1, len);
+	if (_mmap_kernel(pt_base, KERNEL_AREA_START, paddr_start,
+			 KERNEL_AREA_SIZE))
+		UK_CRASH("Could not map kernel\n");
+
+#ifdef CONFIG_PARAVIRT
+	/*
+	 * TODO: Change protections of page tables to read-only before setting
+	 * the new pt base.
+	 */
+#endif
+	ukarch_write_pt_base(pt_base);
+	_virt_offset = PAGETABLES_VIRT_OFFSET;
+	phys_bitmap_start_addr += _virt_offset;
+	pt_bitmap_start_addr += _virt_offset;
+
+#ifdef CONFIG_PARAVIRT
+	heap_pages = heap_len >> PAGE_SHIFT;
+	for (i = 0; i < heap_pages; i++) {
+		page = HEAP_AREA_START + i * PAGE_SIZE;
+
+		if (uk_page_map(page, -1, PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+			uk_pr_err("Error mapping heap page 0x%08lx\n", page);
+	}
+#else
+	/* Map heap in large and regular pages */
+	heap_large_pages = heap_len / PAGE_LARGE_SIZE;
+	for (i = 0; i < heap_large_pages; i++)
+		if (uk_page_map(HEAP_AREA_START + i * PAGE_LARGE_SIZE, -1,
+				PAGE_PROT_READ | PAGE_PROT_WRITE,
+				PAGE_FLAG_LARGE))
+			uk_pr_err("Error mapping heap large page 0x%08lx\n",
+					HEAP_AREA_START + i * PAGE_LARGE_SIZE);
+
+	/*
+	 * If the heap is not properly aligned to PAGE_LARGE_SIZE,
+	 * map the rest in regular pages
+	 */
+	if (heap_large_pages * PAGE_LARGE_SIZE < heap_len) {
+		heap_pages = (heap_len - heap_large_pages * PAGE_LARGE_SIZE)
+				>> PAGE_SHIFT;
+	} else {
+		heap_pages = 0;
+	}
+	for (i = 0; i < heap_pages; i++) {
+		page = HEAP_AREA_START + heap_large_pages * PAGE_LARGE_SIZE
+			+ i * PAGE_SIZE;
+
+		if (uk_page_map(page, -1, PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+			uk_pr_err("Error mapping heap page 0x%08lx\n", page);
+	}
+#endif /* CONFIG_PARAVIRT */
+
+	/* Map stack in regular pages */
+	stack_pages = STACK_AREA_SIZE >> PAGE_SHIFT;
+	for (i = 0; i < stack_pages; i++) {
+		if (uk_page_map(STACK_AREA_START + i * PAGE_SIZE, -1,
+				PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+			uk_pr_err("Error mapping stack page 0x%08lx\n",
+				  (unsigned long) STACK_AREA_START
+				  + i * PAGE_SIZE);
+	}
+}

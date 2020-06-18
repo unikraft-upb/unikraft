@@ -71,6 +71,18 @@ static inline unsigned long uk_pte_read(unsigned long pt, size_t offset,
 	return *((unsigned long *) pt + offset);
 }
 
+static inline int _initmem_pte_write(unsigned long pt, size_t offset,
+		unsigned long val, size_t level)
+{
+	UK_ASSERT(level >= 1 && level <= PAGETABLE_LEVELS);
+	UK_ASSERT(PAGE_ALIGNED(pt));
+	UK_ASSERT(offset < pagetable_entries[level - 1]);
+
+	*((unsigned long *) pt + offset) = val;
+
+	return 0;
+}
+
 int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot,
 		unsigned long flags);
 
@@ -83,6 +95,8 @@ unsigned long uk_virt_to_pte(unsigned long vaddr);
 void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
 		unsigned long len);
 
-#endif /* __UKPLAT_MM__ */
+void uk_pt_build(unsigned long heap_len, unsigned long paddr_start,
+		 unsigned long len);
 
+#endif /* __UKPLAT_MM__ */
 
