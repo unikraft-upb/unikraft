@@ -199,3 +199,8 @@ int mprotect(void *addr, size_t length, int prot)
 	return 0;
 }
 
+int msync(void *addr __unused, size_t length __unused, int flags __unused)
+{
+	errno = ENOTSUP;
+	return -1;
+}
