@@ -74,6 +74,8 @@
 #include <uk/plat/config.h>
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
+#include <uk/plat/mm.h>
+#include <uk/arch/mem_layout.h>
 #include <x86/cpu.h>
 
 #include <xen/xen.h>
@@ -149,6 +151,22 @@ static inline void _init_mem(void)
 	_libxenplat_mrd[0].len   = (size_t) to_virt(max_pfn << __PAGE_SHIFT)
 		- (size_t) to_virt(start_pfn << __PAGE_SHIFT);
 	_libxenplat_mrd[0].flags = (UKPLAT_MEMRF_ALLOCATABLE);
+#if CONFIG_PT_API
+#if CONFIG_LIBPOSIX_MMAP
+	_libxenplat_mrd[0].len =
+		(_libxenplat_mrd[0].len - PAGETABLES_AREA_SIZE) / 2;
+	_libxenplat_mrd[0].base += PAGETABLES_AREA_SIZE;
+	uk_pt_init(_libxenplat_mrd[0].base - PAGETABLES_AREA_SIZE,
+		   (unsigned long) _libxenplat_mrd[0].base
+		   + _libxenplat_mrd[0].len,
+		   _libxenplat_mrd[0].len);
+#else
+	uk_pt_init(_libxenplat_mrd[0].base, 0, 0);
+	_libxenplat_mrd[0].base += PAGETABLES_AREA_SIZE;
+	_libxenplat_mrd[0].len  -= PAGETABLES_AREA_SIZE;
+#endif /* CONFIG_LIBPOSIX_MMAP */
+#endif /* CONFIG_PT_API */
+
 #if CONFIG_UKPLAT_MEMRNAME
 	_libxenplat_mrd[0].name  = "heap";
 #endif
