@@ -35,7 +35,7 @@
 #include <uk/asm.h>
 #include <kvm-arm/mm.h>
 #include <arm/cpu_defs.h>
-#include <uk/plat/common/sections.h>
+#include <uk/sections.h>
 #include <uk/config.h>
 
 .global page_table_size
