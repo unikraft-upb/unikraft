@@ -71,6 +71,11 @@ static inline unsigned long uk_pte_read(unsigned long pt, size_t offset,
 	return *((unsigned long *) pt + offset);
 }
 
+int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot,
+		unsigned long flags);
+
+int uk_page_unmap(unsigned long vaddr);
+
 unsigned long uk_virt_to_pte(unsigned long vaddr);
 
 void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
