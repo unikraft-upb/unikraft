@@ -76,6 +76,8 @@ int uk_page_map(unsigned long vaddr, unsigned long paddr, unsigned long prot,
 
 int uk_page_unmap(unsigned long vaddr);
 
+int uk_page_set_prot(unsigned long vaddr, unsigned long new_prot);
+
 unsigned long uk_virt_to_pte(unsigned long vaddr);
 
 void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
