@@ -34,12 +34,12 @@ link_script:
 
 final_link:
 	gcc $(LDFLAGS) $(OBJS) \
-	-Wl,--start-group    -Wl,--end-group -o static_kernel.ld.o \
+	-Wl,--start-group    -Wl,--end-group -o bootloader.ld.o \
 
-	objcopy -w -G kvmos_* -G _libkvmplat_entry static_kernel.ld.o static_kernel.o \
+	objcopy -w -G kvmos_* -G _libkvmplat_entry bootloader.ld.o bootloader.o \
 
 	gcc  -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none  -no-pie  -Wl,-m,elf_x86_64 -Wl,-dT,link64.lds \
-	static_kernel.o -o static_kernel.dbg
+	bootloader.o -o bootloader.dbg
 
 cpu_features:
 	gcc $(INCLUDES) \
@@ -134,7 +134,7 @@ run_gdb:
 	-serial stdio -device isa-debug-exit -kernel $(exec) -append verbose
 
 clean:
-	rm -rf *.o .*.o.d link64.lds .link64.lds.d static_kernel.*
+	rm -rf *.o .*.o.d link64.lds .link64.lds.d bootloader.*
 	make clean -f Makefile_nolibc
 	make clean -f Makefile_libelf
 	make clean -f Makefile_elfloader
