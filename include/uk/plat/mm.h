@@ -253,4 +253,19 @@ void *uk_stack_alloc();
  */
 int uk_stack_free(void *vaddr);
 
+/**
+ * Create virtual mappings for a new heap of a given length at a given virtual
+ * address.
+ *
+ * @param vaddr: the virtual address of the beginning of the area where the
+ * heap will be mapped.
+ * @param len: the length (in bytes) of the heap.
+ *
+ * @return: 0 in case of success and -1 on failure. The call can fail if:
+ * - the given interval [vaddr, vaddr + len] is not contained in the interval
+ *   [HEAP_AREA_BEGIN, HEAP_AREA_END];
+ * - uk_mmap_region fails.
+ */
+int uk_heap_map(unsigned long vaddr, unsigned long len);
+
 #endif /* __UKPLAT_MM__ */

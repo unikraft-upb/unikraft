@@ -739,3 +739,43 @@ int uk_stack_free(void *vaddr)
 
 	return 0;
 }
+
+int uk_heap_map(unsigned long vaddr, unsigned long len)
+{
+	unsigned long heap_pages, heap_large_pages;
+
+	if (vaddr < HEAP_AREA_START || vaddr + len > HEAP_AREA_END)
+		return -1;
+
+#ifdef CONFIG_PARAVIRT
+	if (uk_map_region(vaddr, PAGE_PADDR_ANY,
+			len >> PAGE_SHIFT, PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+		return -1;
+#else /* CONFIG_PARAVIRT */
+	/* Map heap in large and regular pages */
+	heap_large_pages = len >> PAGE_LARGE_SHIFT;
+	if (uk_map_region(vaddr, PAGE_PADDR_ANY,
+				heap_large_pages,
+				PAGE_PROT_READ | PAGE_PROT_WRITE,
+				PAGE_FLAG_LARGE))
+		return -1;
+
+	/*
+	 * If the heap is not properly aligned to PAGE_LARGE_SIZE,
+	 * map the rest in regular pages
+	 */
+	if ((heap_large_pages << PAGE_LARGE_SHIFT) < len) {
+		heap_pages = (len - (heap_large_pages << PAGE_LARGE_SHIFT))
+				>> PAGE_SHIFT;
+	} else {
+		heap_pages = 0;
+	}
+
+	if (uk_map_region(vaddr + (heap_large_pages << PAGE_LARGE_SHIFT),
+			PAGE_PADDR_ANY, heap_pages,
+			PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+		return -1;
+#endif /* CONFIG_PARAVIRT */
+
+	return 0;
+}
