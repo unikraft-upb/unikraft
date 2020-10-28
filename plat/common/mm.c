@@ -53,6 +53,9 @@ static unsigned long pt_bitmap_length;
 static unsigned long pt_mem_start_addr;
 static unsigned long pt_mem_length;
 
+static unsigned long stack_bitmap_start_addr[UK_BITS_TO_LONGS(STACK_COUNT)];
+static unsigned long stack_bitmap_length = UK_BITS_TO_LONGS(STACK_COUNT);
+
 /*
  * Variable used in the initialization phase during booting when allocating
  * page tables does not use the page table API function uk_pt_alloc_table.
@@ -682,4 +685,57 @@ void uk_pt_build(unsigned long paddr_start, unsigned long len)
 	_virt_offset = PAGETABLES_VIRT_OFFSET;
 	phys_bitmap_start_addr += _virt_offset;
 	pt_bitmap_start_addr += _virt_offset;
+
+	uk_bitmap_zero((unsigned long *) stack_bitmap_start_addr,
+			stack_bitmap_length);
+}
+
+void *uk_stack_alloc()
+{
+	unsigned long stack_start_vaddr;
+	unsigned long offset;
+
+	offset = uk_bitmap_find_next_zero_area(
+			(unsigned long *) stack_bitmap_start_addr,
+			stack_bitmap_length,
+			0 /* start */, 1 /* nr */, 0 /* align_mask */);
+
+	if (offset > STACK_COUNT) {
+		uk_pr_err("No more stacks available\n");
+		return NULL;
+	}
+
+	uk_bitmap_set((unsigned long *) stack_bitmap_start_addr, offset, 1);
+
+	/* Map stack in regular pages */
+	stack_start_vaddr = STACK_AREA_START + offset * __STACK_SIZE;
+	if (uk_map_region(stack_start_vaddr, PAGE_PADDR_ANY,
+			__STACK_SIZE >> PAGE_SHIFT,
+			PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+		return NULL;
+
+	return (void *) stack_start_vaddr;
+}
+
+int uk_stack_free(void *vaddr)
+{
+	unsigned long pages;
+	size_t i;
+
+	if ((unsigned long) vaddr < STACK_AREA_START
+		|| (unsigned long) vaddr > (STACK_AREA_END - __STACK_SIZE)
+		|| (((unsigned long) vaddr) & (__STACK_SIZE - 1)))
+		return -1;
+
+	pages = __STACK_SIZE >> PAGE_SHIFT;
+	for (i = 0; i < pages; i++) {
+		if (uk_page_unmap(((unsigned long) vaddr) + i * PAGE_SIZE)) {
+			uk_pr_err("Page 0x%08lx not previously mapped\n",
+				  ((unsigned long) vaddr) + i * PAGE_SIZE);
+
+			return -1;
+		}
+	}
+
+	return 0;
 }

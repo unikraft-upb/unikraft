@@ -228,4 +228,29 @@ void uk_pt_init(unsigned long pt_area_start, unsigned long paddr_start,
  */
 void uk_pt_build(unsigned long paddr_start, unsigned long len);
 
+/**
+ * Allocate a new stack and return address to its lower address.
+ *
+ * @return: the lower address of the stack. If the returned address is `addr`,
+ * then the allocated stack region is [`addr`, `addr + __STACK_SIZE`]. The
+ * maximum number of stacks that can be allocated denotes the maximum number
+ * of threads that can co-exist. More details about the number of stacks in
+ * include/uk/mem_layout.h. Returns NULL in case of failure.
+ */
+void *uk_stack_alloc();
+
+/**
+ * Frees a stack previously allocated with uk_stack_alloc().
+ *
+ * @param vaddr: the virtual address of the beginning of the stack (i.e. the
+ * address returned by uk_stack_alloc()).
+ *
+ * @return: 0 in case of success and -1 on failure. The call can fail if:
+ * - the given address is not a stack address previously returned by
+ *   uk_stack_alloc (which is between STACK_AREA_BEGIN and STACK_AREA_END);
+ * - the given address is not page aligned;
+ * - (on Xen) the hypervisor rejected the unmapping.
+ */
+int uk_stack_free(void *vaddr);
+
 #endif /* __UKPLAT_MM__ */
