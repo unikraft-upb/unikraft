@@ -158,8 +158,14 @@ exit:
 }
 
 /* defined in <uk/plat.h> */
+extern char _stbootdata[];
 void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 {
+        /*__asm__("pushq %rax\n\t"
+                "xor %rax, %rax\n\t"
+                "movb $0xff, %al\n\t"
+                "lfsw 0xffffffff, %edx\n\t"
+                "popq %rax");*/
 	static char *argv[CONFIG_LIBUKBOOT_MAXNBARGS];
 	int argc = 0;
 

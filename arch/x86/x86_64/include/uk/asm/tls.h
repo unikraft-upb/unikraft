@@ -37,7 +37,7 @@
 #include <uk/arch/types.h>
 #include <string.h>
 
-extern char _tls_start[], _etdata[], _tls_end[];
+extern char _tls_start[], _etdata[], _tls_end[]; 
 
 static inline __sz ukarch_tls_area_size(void)
 {
@@ -55,12 +55,15 @@ static inline __sz ukarch_tls_area_align(void)
 
 static inline void ukarch_tls_area_copy(void *tls_area)
 {
+        /* needs update */
 	__sz tls_len = _tls_end - _tls_start;
 	__sz tls_data_len = _etdata - _tls_start;
 	__sz tls_bss_len = _tls_end - _etdata;
 
+
 	memcpy(tls_area, _tls_start, tls_data_len);
 	memset(tls_area + tls_data_len, 0, tls_bss_len);
+
 	/* x86_64 ABI requires that fs:%0 contains the address of itself. */
 	*((__uptr *)(tls_area + tls_len)) = (__uptr)(tls_area + tls_len);
 }

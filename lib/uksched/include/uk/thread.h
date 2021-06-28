@@ -77,6 +77,15 @@ struct uk_thread {
 
 UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 
+#define __ukthreadbss(type, name) \
+            __thread type name; \
+            __thread type name##boot __attribute__((section(".tbootbss")))
+
+#define __ukthreaddata(type, name, value) \
+            __thread type name = value; \
+            __thread type name##boot __attribute__((section(".tbootdata"))) = value
+#define __ukthread_selector(arg1, arg2, arg3, arg4, ...) arg4
+#define __ukthread(...) __ukthread_selector(__VA_ARGS__, __ukthreaddata, __ukthreadbss)(__VA_ARGS__)
 #define uk_thread_create_attr(name, attr, function, data) \
 	uk_sched_thread_create(uk_sched_get_default(), \
 			name, attr, function, data)
