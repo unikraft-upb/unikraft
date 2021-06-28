@@ -72,6 +72,11 @@
 
 int main(int argc, char *argv[]) __weak;
 
+#if 1 // maybe a new CONFIG condition?
+__thread char tbootbss_placeholder __attribute__((section(".tbootbss"))) = 0;
+__thread char tbootdata_placeholder __attribute__((section(".tbootdata"))) = 1;
+#endif
+
 static void main_thread_func(void *arg) __noreturn;
 
 struct thread_main_arg {
