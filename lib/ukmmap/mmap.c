@@ -38,6 +38,13 @@
 #include <uk/syscall.h>
 #include <uk/page.h>
 
+#ifdef DRUNTIME
+#include <uk/essentials.h>
+
+#define size_to_num_pages(size) \
+	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
+#endif
+
 struct mmap_addr {
 	void *begin;
 	void *end;
@@ -94,6 +101,12 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 		last = tmp;
 		tmp = tmp->next;
 	}
+/*#ifdef DRUNTIME*/
+	/*int num_pages = size_to_num_pages(len);*/
+	/*void *mem = uk_palloc(uk_alloc_get_default(), num_pages);*/
+/*#else*/
+	/*void *mem = uk_malloc(uk_alloc_get_default(), len);*/
+/*#endif*/
 
 	void *mem = uk_memalign(uk_alloc_get_default(), __PAGE_SIZE, len);
 	if (!mem) {
@@ -135,6 +148,7 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 {
 	struct mmap_addr *tmp = mmap_addr, *prev = NULL;
+	size_t remain_mem;
 
 	if (!len) {
 		errno = EINVAL;
@@ -145,6 +159,35 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 		return 0;
 
 	while (tmp) {
+#ifndef DRUNTIME
+		if (addr != tmp->begin) {
+			if (tmp->end > addr + len) {
+				errno = EINVAL;
+				return -1;
+			}
+			remain_mem = tmp->end - addr - len;
+			if (remain_mem) {
+
+				void *mem = uk_malloc(uk_alloc_get_default(),
+						remain_mem);
+				if (!mem) {
+					errno = ENOMEM;
+					return -1;
+				}
+				memcpy(mem, addr+len, remain_mem);
+				tmp->begin = mem;
+			} else {
+
+				if (!prev)
+					mmap_addr = tmp->next;
+				else
+					prev->next = tmp->next;
+				uk_free(uk_alloc_get_default(), tmp);
+			}
+			uk_free(uk_alloc_get_default(), addr);
+			return 0;
+		}
+#else
 		if (addr >= tmp->begin && addr < tmp->end) {
 			/* We cannot release only some part of the allocation.
 			 * In that case, pretend we have done it and hope
@@ -163,7 +206,9 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 			uk_free(uk_alloc_get_default(), addr);
 			return 0;
 		}
+#endif
 
+		prev = tmp;
 		tmp = tmp->next;
 	}
 
