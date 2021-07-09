@@ -266,6 +266,34 @@ ENTRY(_libkvmplat_newstack)
 	movq %rdi, %rsp
 	movq %rdx, %rdi
 
+        pushq %rdi
+        pushq %rsi
+        pushq %rcx
+        pushq %rax
+
+        movq $_tls_start, %rsi  // beginning of TLS (.tdata)
+        movq $_stbootdata, %rdi // beginning of boot TLS (.tbootdata), end of .bss
+        movq $_tdata_size, %rcx // size of .tdata
+        rep movsb  // memcpy
+
+        xor %rax, %rax  // fill with zeroes
+        movq $_stbootbss, %rdi  // start of tbootbss (end of bss + sizeof .tdata)
+        movq $_tbss_size, %rcx  // size of .tbss
+        rep stosb  // memset with 0
+
+        popq %rax
+        popq %rcx
+        popq %rsi
+        popq %rdi
+
+        pushq %rdi
+        mov $_stbootdata, %rdi
+        wrfsbase %rdi
+        popq %rdi
+
+        pushq %r14
+        rdfsbase %r14  // r14 == _stbootdata checks out
+        popq %r14
 	pushq $0x0
 	pushq $0x0
 

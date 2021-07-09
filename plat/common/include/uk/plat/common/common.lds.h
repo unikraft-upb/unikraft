@@ -119,6 +119,17 @@
 		*(.gnu.linkonce.tb.*)					\
 		. = ALIGN(0x8);						\
 	}								\
+        _etbss = . + SIZEOF(.tbss); \
 	_tls_end = . + SIZEOF(.tbss);
+#define BOOT_TLS_SECTIONS \
+    _tbss_size = SIZEOF(.tbss); \
+    _tdata_size = SIZEOF(.tdata); \
+    . += SIZEOF(.tbss); \
+    _stbootdata = .; \
+    . += SIZEOF(.tdata); \
+    _etbootdata = .; \
+    _stbootbss = .; \
+    . += SIZEOF(.tbss); \
+    _etbootbss = .; 
 
 #endif /* __UK_COMMON_LDS_H */
