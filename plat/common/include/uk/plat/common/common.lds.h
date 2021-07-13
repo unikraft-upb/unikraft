@@ -105,20 +105,31 @@
 #define TLS_SECTIONS							\
 	. = ALIGN(0x8);							\
 	_tls_start = .;							\
-	.tdata :							\
-	{								\
-		*(.tdata)						\
-		*(.tdata.*)						\
-		*(.gnu.linkonce.td.*)					\
-	}								\
-	_etdata = .;							\
+        _stbss = .; \
 	.tbss :								\
 	{								\
 		*(.tbss)						\
 		*(.tbss.*)						\
 		*(.gnu.linkonce.tb.*)					\
-		. = ALIGN(0x8);						\
 	}								\
-	_tls_end = . + SIZEOF(.tbss);
+        _etbss = . + SIZEOF(.tbss); \
+        . += SIZEOF(.tbss); \
+        . = ALIGN(0x8); \
+	.tdata :							\
+	{								\
+		*(.tdata)						\
+		*(.tdata.*)						\
+		*(.gnu.linkonce.td.*)					\
+                _stdata = .; \
+	}								\
+	_etdata = . + SIZEOF(.tdata);							\
+	. = ALIGN(0x8);						\
+	_tls_end = .; \
+        _stbootdata = .; \
+        . += SIZEOF(.tdata); \
+        _etbootdata = .; \
+        _stbootbss = .; \
+        . += SIZEOF(.tbss); \
+        _etbootbss = .;
 
 #endif /* __UK_COMMON_LDS_H */

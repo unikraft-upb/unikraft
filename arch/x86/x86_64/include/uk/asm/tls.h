@@ -37,7 +37,7 @@
 #include <uk/arch/types.h>
 #include <string.h>
 
-extern char _tls_start[], _etdata[], _tls_end[];
+extern char _tls_start[], _etdata[], _tls_end[], _stbss[], _etbss[], _stdata[];
 
 static inline __sz ukarch_tls_area_size(void)
 {
@@ -56,10 +56,15 @@ static inline __sz ukarch_tls_area_align(void)
 static inline void ukarch_tls_area_copy(void *tls_area)
 {
 	__sz tls_len = _tls_end - _tls_start;
-	__sz tls_data_len = _etdata - _tls_start;
-	__sz tls_bss_len = _tls_end - _etdata;
+	__sz tls_data_len = _etdata - _stdata;
+	__sz tls_bss_len = _etbss - _stbss;
 
-	memcpy(tls_area, _tls_start, tls_data_len);
+        /*printf("tls_len: %lu\ntls_data_len: %lu\ntls_bss_len: %lu\n"
+                "_tls_start: %lu\n_tls_end: %lu\n_stdata: %lu\n_etdata: %lu\n"
+                "_stbss: %lu\n_etbss: %lu\n", tls_len, tls_data_len, tls_bss_len,
+                _tls_start, _tls_end, _stdata, _etdata, _stbss, _etbss);*/
+
+	memcpy(tls_area, _stdata, tls_data_len);
 	memset(tls_area + tls_data_len, 0, tls_bss_len);
 	/* x86_64 ABI requires that fs:%0 contains the address of itself. */
 	*((__uptr *)(tls_area + tls_len)) = (__uptr)(tls_area + tls_len);
