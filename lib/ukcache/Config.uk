@@ -1,0 +1,5 @@
+menuconfig LIBUKCACHE
+	bool "ukcache: General page-based cache library"
+	default n
+	select LIBUKALLOC
+

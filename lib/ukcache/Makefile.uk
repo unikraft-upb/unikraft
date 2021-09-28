@@ -1,0 +1,5 @@
+$(eval $(call addlib_s,libukcache,$(CONFIG_LIBUKCACHE)))
+
+CINCLUDES-$(CONFIG_LIBUKCACHE) += -I$(LIBUKCACHE_BASE)/include
+
+LIBUKCACHE_SRCS-$(CONFIG_LIBUKCACHE) += $(LIBUKCACHE_BASE)/cache.c

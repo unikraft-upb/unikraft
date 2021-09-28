@@ -1,0 +1,7 @@
+ukcache_new
+ukcache_free
+ukcache_key_space_new
+ukcache_key_space_free
+ukcache_get
+ukcache_node_rel
+
