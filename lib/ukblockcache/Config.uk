@@ -1,0 +1,17 @@
+menuconfig LIBUKBLOCKCACHE
+	bool "ukblockcache: Implementation of the BSD buffer cache API"
+	default n
+	select LIBUKCACHE
+	select LIBUKALLOCPOOL
+	select LIBUKBLKDEV
+
+if LIBUKBLOCKCACHE
+
+config LIBUKBLOCKCACHE_SIZE
+	int "Cache Size"
+	default 512
+	help
+		Size of filesystem block cache in pages. Does not include space
+		necessary for the management structures.
+
+endif
