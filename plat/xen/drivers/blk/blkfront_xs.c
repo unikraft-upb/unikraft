@@ -77,8 +77,8 @@ static int blkfront_xb_get_nb_max_queues(struct blkfront_dev *dev)
 				"%"SCNu16,
 				&dev->nb_queues);
 	if (err < 0) {
-		uk_pr_err("Failed to read multi-queue-max-queues: %d\n", err);
-		return err;
+		uk_pr_info("Failed to read multi-queue-max-queues: %d, Fall back to 1.\n", err);
+		dev->nb_queues = 1;
 	}
 
 	return 0;
