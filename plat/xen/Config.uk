@@ -150,4 +150,15 @@ config XEN_9PFRONT_RING_ORDER
 		create rings of size 4K, 8K, 16K, ..., 2M respectively.
 		Will be clamped to the maximum value allowed by the backend.
 endmenu
+
+config XEN_SHUTDOWN
+	bool "Shutdown request handler"
+	depends on LIBUKSCHED
+	depends on XEN_XENBUS
+	default y
+	help
+		Starts a handler thread that listens on request
+		via the XenStore entry `control/shutdown`. This
+		option enables handling on hypervisor shutdown
+		requests.
 endif
