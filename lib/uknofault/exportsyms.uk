@@ -1,0 +1,6 @@
+uk_memprobe_r
+uk_memprobe_r_isr
+uk_memprobe_rw
+uk_memprobe_rw_isr
+uk_memcpy_nofault
+uk_memcpy_nofault_isr

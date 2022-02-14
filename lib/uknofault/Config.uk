@@ -1,0 +1,9 @@
+menuconfig LIBUKNOFAULT
+  bool "uknofault: Fault-safe memory access functions"
+  default n
+  help
+    Provide functions for probing memory addresses and performing memcpy's that
+    do not fault but return an error code instead.
+
+if LIBUKNOFAULT
+endif

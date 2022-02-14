@@ -29,10 +29,10 @@
 #include <uk/config.h>
 #include <uk/essentials.h>
 #if (CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE)
-#include <kvm-x86/vga_console.h>
+#include <kvm/vga_console.h>
 #endif
 #if (CONFIG_KVM_DEBUG_SERIAL_CONSOLE || CONFIG_KVM_KERNEL_SERIAL_CONSOLE)
-#include <kvm-x86/serial_console.h>
+#include <kvm/serial_console.h>
 #endif
 
 void _libkvmplat_init_console(void)

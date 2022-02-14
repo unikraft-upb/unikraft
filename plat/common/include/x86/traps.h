@@ -62,6 +62,7 @@
 #define ASM_TRAP_SYM(trapname)   asm_trap_##trapname
 
 #ifndef __ASSEMBLY__
+#include <uk/event.h>
 
 #define DECLARE_ASM_TRAP(trapname) \
 	void ASM_TRAP_SYM(trapname)(void)

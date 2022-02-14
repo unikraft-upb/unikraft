@@ -284,6 +284,11 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 
 	pl011_console_init(dtb_pointer);
 
+#if defined(CONFIG_HAVE_DEBUGGER) && defined (CONFIG_LIBUKDEBUG_GDB_WAIT_BOOT)
+	uk_pr_info("Waiting for debugger...\n");
+	ukarch_dbg_break();
+#endif /* CONFIG_HAVE_DEBUGGER && CONFIG_LIBUKDEBUG_GDB_WAIT_BOOT */
+
 	uk_pr_info("Entering from KVM (arm64)...\n");
 
 	/* Get command line from DTB */

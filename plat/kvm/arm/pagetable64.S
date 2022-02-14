@@ -111,4 +111,3 @@ ENTRY(start_mmu)
 
 	ret
 END(start_mmu)
-

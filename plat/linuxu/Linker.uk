@@ -8,10 +8,8 @@ LINUXU_DEBUG_IMAGE := $(LINUXU_IMAGE).dbg
 LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
 			    $(LINUXU_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
-$(LINUXU_DEBUG_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
-		       $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
-		       $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
-	$(call build_cmd,LD,,$@,\
+define build_linuxu =
+	$(call build_cmd,LD,,$(2),\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(LINUXU_LDFLAGS) $(LINUXU_LDFLAGS-y) \
 		     $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
@@ -21,9 +19,42 @@ $(LINUXU_DEBUG_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
 		     $(UK_ALIBS) $(UK_ALIBS-y) \
 		     -Wl$(comma)--end-group \
 		     $(LINUXU_LD_SCRIPT_FLAGS) \
-		     -o $@)
+		     $(1) \
+		     -o $(2))
+endef
 
-$(LINUXU_IMAGE): $(LINUXU_IMAGE).dbg
+define build_symtab =
+	$(call build_cmd,NM,,$(1), $(NM) -n $(1) > $(1).sym)
+	$(call build_cmd,UKSYMS,,$(1).sym.S,\
+		$(SCRIPTS_DIR)/mksymS.py $(1).sym \
+			$(1).sym.S)
+	$(call build_cmd,AS,,$(1).sym.S.o,\
+		$(AS) $(ASINCLUDES) $(ASINCLUDES-y) \
+		      $(ASFLAGS) $(ASFLAGS-y) \
+		      $(DBGFLAGS) $(DBGFLAGS-y) \
+		      -c $(1).sym.S \
+		      -o $(1).sym.S.o)
+endef
+
+$(LINUXU_DEBUG_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
+		       $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
+		       $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
+	$(call build_linuxu,,$@)
+##
+## If we want to embed debug symbols, we have to rebuild the binary to include
+## the table. This will however, change addresses and we have to rebuild again
+## to update the table.
+##
+ifeq ($(CONFIG_DEBUG_EMBED_SYMBOLS),y)
+## 2nd pass - embed symbols
+	$(call build_symtab,$@)
+	$(call build_linuxu,$@.sym.S.o,$@)
+## 3rd pass - update symbols
+	$(call build_symtab,$@)
+	$(call build_linuxu,$@.sym.S.o,$@)
+endif
+
+$(LINUXU_IMAGE): $(LINUXU_DEBUG_IMAGE)
 	$(call build_cmd,SCSTRIP,,$@,\
 		$(SCRIPTS_DIR)/sect-strip.py \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
@@ -40,3 +71,8 @@ UK_DEBUG_IMAGES-y                     += $(LINUXU_DEBUG_IMAGE)
 UK_IMAGES-y                           += $(LINUXU_IMAGE)
 UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(LINUXU_IMAGE).sym
 endif
+
+# ...for cleaning:
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_DEBUG_IMAGE).sym)
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_DEBUG_IMAGE).sym.S)
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_DEBUG_IMAGE).sym.S.o)

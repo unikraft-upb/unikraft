@@ -472,6 +472,11 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 	_init_cpufeatures();
 	intctrl_init();
 
+#if defined(CONFIG_HAVE_DEBUGGER) && defined (CONFIG_LIBUKDEBUG_GDB_WAIT_BOOT)
+	uk_pr_info("Waiting for debugger...\n");
+	ukarch_dbg_break();
+#endif /* CONFIG_HAVE_DEBUGGER && CONFIG_LIBUKDEBUG_GDB_WAIT_BOOT */
+
 	uk_pr_info("Entering from KVM (x86)...\n");
 	uk_pr_info("     multiboot: %p\n", mi);
 

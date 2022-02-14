@@ -35,6 +35,14 @@
 #include <uk/plat/common/sections.h>
 #include <uk/config.h>
 
+.macro _CPU_HALT
+	/* Disable interrupts and enter quiescent state */
+	msr daifset, #2
+1:
+	wfi
+	b 1b
+.endm
+
 /*
  * The registers used by _libkvmplat_start:
  * x0 - FDT pointer
@@ -83,13 +91,17 @@ ENTRY(_libkvmplat_entry)
 
 	/* Setup exception vector table address before enable MMU */
 	ldr x29, =vector_table
-	msr VBAR_EL1, x29
+	msr vbar_el1, x29
 
 	/* Enable the mmu */
 	bl start_mmu
 
+	/* Set initial frame pointer. Must be NULL for the outer most record */
+	mov x29, xzr
+
 	/* Load dtb address to x0 as a parameter */
 	ldr x0, =_dtb
-	b _libkvmplat_start
-END(_libkvmplat_entry)
+	bl _libkvmplat_start
 
+	_CPU_HALT
+END(_libkvmplat_entry)

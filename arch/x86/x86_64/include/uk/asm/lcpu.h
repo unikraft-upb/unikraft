@@ -147,4 +147,8 @@ static inline void ukarch_x86_cpuid(__u32 fn, __u32 subfn,
 			     : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
 			     : "a"(fn), "c" (subfn));
 }
+
+#define ukarch_dbg_break()						\
+	do { __asm__ __volatile__("int3" : : : "memory"); } while (0)
+
 #endif /* !__ASSEMBLY__ */

@@ -83,7 +83,7 @@
 #define LVLC_CRIT_MSG	""
 #endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
 
-#define BUFLEN 192
+#define BUFLEN 256
 /* special level for printk redirection, used internally only */
 #define KLVL_DEBUG (-1)
 

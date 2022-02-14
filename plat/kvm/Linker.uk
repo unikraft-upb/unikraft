@@ -11,15 +11,19 @@ endif
 ##
 KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
 KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
-
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 			 $(UK_PLAT_KVM_DEF_LDS))
 KVM_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
-$(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
-		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
-	$(call build_cmd,LD,,$(KVM_IMAGE).ld.o,\
+ifeq ($(CONFIG_OPTIMIZE_LDMAP),y)
+KVM_LDMAP_FLAGS += -Wl$(comma)-M -Wl$(comma)-Map=$(KVM_IMAGE).ld.map
+else
+KVM_LDMAP_FLAGS :=
+endif
+
+define build_kvm_image =
+	$(call build_cmd,LD,,$(2).ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 			$(KVM_OLIBS) $(KVM_OLIBS-y) \
@@ -29,17 +33,50 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
-			-o $(KVM_IMAGE).ld.o)
-	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
+			$(KVM_LDMAP_FLAGS) \
+			$(1) \
+			-o $(2).ld.o)
+	$(call build_cmd,OBJCOPY,,$(2).o,\
 		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
-			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
+			$(2).ld.o $(2).o)
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $(KVM_IMAGE).o -o $@)
+		     $(2).o -o $@)
+endef
 
-$(KVM_IMAGE): $(KVM_IMAGE).dbg
+define build_symtab =
+	$(call build_cmd,NM,,$(1), $(NM) -n $(1) > $(1).sym)
+	$(call build_cmd,UKSYMS,,$(1).sym.S,\
+		$(SCRIPTS_DIR)/mksymS.py $(1).sym \
+			$(1).sym.S)
+	$(call build_cmd,AS,,$(1).sym.S.o,\
+		$(AS) $(ASINCLUDES) $(ASINCLUDES-y) \
+		      $(ASFLAGS) $(ASFLAGS-y) \
+		      $(DBGFLAGS) $(DBGFLAGS-y) \
+		      -c $(1).sym.S \
+		      -o $(1).sym.S.o)
+endef
+
+$(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
+	$(call build_kvm_image,,$@)
+##
+## If we want to embed debug symbols, we have to rebuild the binary to include
+## the table. This will however, change addresses and we have to rebuild again
+## to update the table.
+##
+ifeq ($(CONFIG_DEBUG_EMBED_SYMBOLS),y)
+## 2nd pass - embed symbols
+	$(call build_symtab,$@)
+	$(call build_kvm_image,$@.sym.S.o,$@)
+## 3rd pass - update symbols
+	$(call build_symtab,$@)
+	$(call build_kvm_image,$@.sym.S.o,$@)
+endif
+
+$(KVM_IMAGE): $(KVM_DEBUG_IMAGE)
 	$(call build_cmd,SCSTRIP,,$@,\
 		$(SCRIPTS_DIR)/sect-strip.py \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
@@ -62,5 +99,8 @@ UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(KVM_IMAGE).gz
 endif
 
 # ...for cleaning:
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).o)
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).ld.o)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).o)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).ld.o)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).sym)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).sym.S)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).sym.S.o)

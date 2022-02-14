@@ -145,6 +145,19 @@ config OPTIMIZE_SYMFILE
 	help
 		Create a separate file with all symbol locations
 
+config OPTIMIZE_LDMAP
+	bool "Create linker map file"
+	default n
+	help
+		Create a map file indicating what has been linked into the
+		final binary
+
+config DEBUG_EMBED_SYMBOLS
+	bool "Embed symbols in final image (release and debug)"
+	default n
+	help
+		Allow symbol information to be displayed in case of an error.
+
 config OPTIMIZE_COMPRESS
 	bool "Compress images"
 	default y

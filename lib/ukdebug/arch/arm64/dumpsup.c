@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ * Author(s): Marc Rittinghaus <marc.rittinghaus@kit.edu>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, Karlsruhe Institute of Technology. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,62 +30,53 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/plat/common/trace.h>
-#include <uk/print.h>
+#include "../../crashdump.h"
+#include "../../outf.h"
 
-#define PAGE_SIZE 4096 /* TODO take this from another header */
+#include <uk/nofault.h>
 
-
-void dump_regs(struct __regs *regs)
+void cdmp_arch_print_registers(struct out_dev *o, struct __regs *regs)
 {
-	uk_pr_crit("RIP: %016lx CS: %04lx\n", regs->rip, regs->cs & 0xffff);
-	uk_pr_crit("RSP: %016lx SS: %04lx EFLAGS: %08lx\n",
-			regs->rsp, regs->ss, regs->eflags);
-	uk_pr_crit("RAX: %016lx RBX: %016lx RCX: %016lx\n",
-			regs->rax, regs->rbx, regs->rcx);
-	uk_pr_crit("RDX: %016lx RSI: %016lx RDI: %016lx\n",
-			regs->rdx, regs->rsi, regs->rdi);
-	uk_pr_crit("RBP: %016lx R08: %016lx R09: %016lx\n",
-			regs->rbp, regs->r8, regs->r9);
-	uk_pr_crit("R10: %016lx R11: %016lx R12: %016lx\n",
-			regs->r10, regs->r11, regs->r12);
-	uk_pr_crit("R13: %016lx R14: %016lx R15: %016lx\n",
-			regs->r13, regs->r14, regs->r15);
+	int i;
+
+	outf(o, "PC : %016lx\n", regs->pc);
+	outf(o, "LR : %016lx\n", regs->lr);
+	outf(o, "SP : %016lx\n", regs->sp);
+	outf(o, "PSTATE: %08lx\n", regs->pstate & 0xffffffff);
+
+	for (i = 0; i < 30; i += 2) {
+		outf(o, "X%-2d: %016lx X%-2d: %016lx\n",
+			i, regs->x[i], i + 1, regs->x[i + 1]);
+	}
 }
 
-/* TODO to be removed; we should use uk_hexdump() instead */
-void dump_mem(unsigned long addr)
+void cdmp_arch_print_stack(struct out_dev *o, struct __regs *regs)
 {
-	unsigned long i;
-
-	if (addr < PAGE_SIZE)
-		return;
-
-	for (i = ((addr) - 16) & ~15; i < (((addr) + 48) & ~15); i++) {
-		if (!(i % 16))
-			uk_pr_crit("\n%lx:", i);
-		uk_pr_crit(" %02x", *(unsigned char *) i);
-	}
-	uk_pr_crit("\n");
+	/* Nothing special to be done. Just call the generic version */
+	cdmp_gen_print_stack(o, regs->sp);
 }
 
 #if !__OMIT_FRAMEPOINTER__
-void stack_walk(void)
+void cdmp_arch_print_call_trace(struct out_dev *o, struct __regs *regs)
 {
-	unsigned long bp;
+	unsigned long fp = regs->x[29];
+	unsigned long *frame;
+	int depth_left = 32;
 
-	asm("movq %%rbp, %0" : "=r"(bp));
+	outf(o, "Call Trace:\n");
 
-	stack_walk_for_frame(bp);
-}
+	cdmp_gen_print_call_trace_entry(o, regs->pc);
 
-void stack_walk_for_frame(unsigned long frame_base)
-{
-	unsigned long *frame = (void *) frame_base;
+	while (((frame = (void*)fp)) && (depth_left-- > 0)) {
+		if (!uk_memprobe_r_isr(fp, sizeof(unsigned long) * 2)) {
+			outf(o, " Bad frame pointer\n");
+			break;
+		}
 
-	uk_pr_crit("base is %#lx ", frame_base);
-	uk_pr_crit("caller is %#lx\n", frame[1]);
-	if (frame[0])
-		stack_walk_for_frame(frame[0]);
+		cdmp_gen_print_call_trace_entry(o, frame[1]);
+
+		/* Goto next frame */
+		fp = frame[0];
+	}
 }
 #endif /* !__OMIT_FRAMEPOINTER__ */

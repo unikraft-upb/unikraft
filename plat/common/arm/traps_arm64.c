@@ -98,14 +98,28 @@ DECLARE_TRAP_EVENT(UKARCH_TRAP_SECURITY);
 static const struct {
 	struct uk_event *event;
 	const char *str;
+	int signr;
 } _trap_table[AARCH64_TRAP_MAX] = {
-	{ UK_EVENT_PTR(UKARCH_TRAP_INVALID_OP), "invalid op"     },
-	{ UK_EVENT_PTR(UKARCH_TRAP_DEBUG),      "debug"          },
-	{ UK_EVENT_PTR(UKARCH_TRAP_PAGE_FAULT), "page fault"     },
-	{ UK_EVENT_PTR(UKARCH_TRAP_BUS_ERROR),  "bus error"      },
-	{ UK_EVENT_PTR(UKARCH_TRAP_MATH),       "floating point" },
-	{ UK_EVENT_PTR(UKARCH_TRAP_SECURITY),   "security"       }
+	{UK_EVENT_PTR(UKARCH_TRAP_INVALID_OP), "invalid op",     4 /*SIGILL */},
+	{UK_EVENT_PTR(UKARCH_TRAP_DEBUG),      "debug",          5 /*SIGTRAP*/},
+	{UK_EVENT_PTR(UKARCH_TRAP_PAGE_FAULT), "page fault",    11 /*SIGSEGV*/},
+	{UK_EVENT_PTR(UKARCH_TRAP_BUS_ERROR),  "bus error",      7 /*SIGBUS */},
+	{UK_EVENT_PTR(UKARCH_TRAP_MATH),       "floating point", 8 /*SIGFPE */},
+	{UK_EVENT_PTR(UKARCH_TRAP_SECURITY),   "security",       4 /*SIGILL */}
 };
+
+static inline int trap_to_sig(enum aarch64_trap trap)
+{
+	/* If there is no suitable signal, just return SIGSEGV */
+	return (trap < AARCH64_TRAP_MAX) ?
+		_trap_table[trap].signr : 11 /* SIGSEGV */;
+}
+
+static inline const char* trap_to_str(enum aarch64_trap trap)
+{
+	return (trap < AARCH64_TRAP_MAX) ?
+		_trap_table[trap].str : "unknown";
+}
 
 static enum aarch64_trap esr_to_trap(__u64 esr)
 {
@@ -151,36 +165,19 @@ static enum aarch64_trap esr_to_trap(__u64 esr)
 	return AARCH64_TRAP_MAX;
 }
 
-static void dump_registers(struct __regs *regs, __u64 far)
+void do_unhandled_trap(int el, int reason, struct __regs *regs,
+		       unsigned long esr, unsigned long far)
 {
-	int idx;
+	enum aarch64_trap trap = esr_to_trap(esr);
 
-	uk_pr_crit("\t SP       : 0x%016lx\n", regs->sp);
-	uk_pr_crit("\t ESR_EL1  : 0x%016lx\n", regs->esr_el1);
-	uk_pr_crit("\t ELR_EL1  : 0x%016lx\n", regs->elr_el1);
-	uk_pr_crit("\t LR (x30) : 0x%016lx\n", regs->lr);
-	uk_pr_crit("\t PSTATE   : 0x%016lx\n", regs->spsr_el1);
-	uk_pr_crit("\t FAR_EL1  : 0x%016lx\n", far);
+	UK_ASSERT(reason < NUM_TRAP_MODES);
 
-	for (idx = 0; idx < 28; idx += 4)
-		uk_pr_crit("\t x%02d ~ x%02d: 0x%016lx 0x%016lx 0x%016lx 0x%016lx\n",
-			   idx, idx + 3, regs->x[idx], regs->x[idx + 1],
-			   regs->x[idx + 2], regs->x[idx + 3]);
-
-	uk_pr_crit("\t x28 ~ x29: 0x%016lx 0x%016lx\n",
-		   regs->x[28], regs->x[29]);
+	UK_CRASH_EX(trap_to_sig(trap), regs,
+		    "Unhandled %s (%s), el=%d, esr=0x%016lx, far=0x%016lx\n",
+		    trap_modes[reason], trap_to_str(trap), el, esr, far);
 }
 
-void invalid_trap_handler(struct __regs *regs, __u32 el, __u32 reason,
-			  __u64 far)
-{
-	uk_pr_crit("EL%d invalid %s trap caught\n",
-		   el, exception_modes[reason]);
-	dump_registers(regs, far);
-	ukplat_crash();
-}
-
-void trap_el1_sync(struct __regs *regs, __u64 far)
+void do_el1_sync(struct __regs *regs, unsigned long esr, unsigned long far)
 {
 	struct ukarch_trap_ctx ctx = {regs, regs->esr_el1, 1, 0, far};
 	enum aarch64_trap trap = esr_to_trap(regs->esr_el1);
@@ -189,12 +186,10 @@ void trap_el1_sync(struct __regs *regs, __u64 far)
 		if (uk_raise_event_ptr(_trap_table[trap].event, &ctx))
 			return;
 
-	uk_pr_crit("EL1 sync trap caught\n");
-	dump_registers(regs, far);
-	ukplat_crash();
+	do_unhandled_trap(1, 0, regs, esr, far);
 }
 
-void trap_el1_irq(void)
+void do_el1_irq(struct __regs *regs)
 {
 	UK_ASSERT(gic);
 

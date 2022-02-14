@@ -32,6 +32,7 @@
 
 #ifndef _UK_TRACE_H_
 #define _UK_TRACE_H_
+#include "uk/print.h"
 #include <uk/essentials.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -199,8 +200,10 @@ static inline char *__uk_trace_get_buff(size_t *free)
 {
 	struct uk_tracepoint_header *ret;
 
-	if (uk_trace_buffer_free < sizeof(*ret))
+	if (uk_trace_buffer_free < sizeof(*ret)) {
+		uk_pr_warn_once("Trace buffer full.\n");
 		return 0;
+	}
 	ret = (struct uk_tracepoint_header *) uk_trace_buffer_writep;
 
 	/* In case we fail to fill the tracepoint for any reason, make

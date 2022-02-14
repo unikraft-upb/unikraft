@@ -31,7 +31,7 @@
 #include <string.h>
 #include <x86/cpu.h>
 #include <x86/irq.h>
-#include <kvm-x86/vga_console.h>
+#include <kvm/vga_console.h>
 
 /* Hardware text mode color constants. */
 enum vga_color {

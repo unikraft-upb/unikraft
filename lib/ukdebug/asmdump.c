@@ -38,6 +38,16 @@
 #include <errno.h>
 #include "outf.h"
 
+#if (defined __PTR_IS_64)
+#define ASD_ADDR_CHARS "16"
+#elif (defined __PTR_IS_32)
+#define ASD_ADDR_CHARS "8"
+#elif (defined __PTR_IS_16)
+#define ASD_ADDR_CHARS "4"
+#else
+#error "Unknown pointer size."
+#endif
+
 #if CONFIG_LIBZYDIS
 #include <Zydis/Zydis.h>
 
@@ -82,7 +92,8 @@ static int _asmdump(struct out_dev *o,
 			break;
 		ZydisFormatterFormatInstruction(&fmt, &ins, buf, sizeof(buf),
 						addr);
-		ret = outf(o, "%08"__PRIuptr" <+%d>: %hs\n", addr, offset, buf);
+		ret = outf(o, "%0"ASD_ADDR_CHARS __PRIuptr" <+%d>: %hs\n",
+			   addr, offset, buf);
 		if (ret < 0)
 			return ret;
 

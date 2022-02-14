@@ -105,7 +105,7 @@ static void init_pl011(uint64_t bas)
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
 }
 
-void pl011_console_init(const void *dtb)
+void _libkvmplat_init_serial_console(void)
 {
 	int offset, len, naddr, nsize;
 	const uint64_t *regs;
@@ -136,11 +136,6 @@ void pl011_console_init(const void *dtb)
 	uk_pr_info("PL011 UART initialized\n");
 }
 
-int ukplat_coutd(const char *str, uint32_t len)
-{
-	return ukplat_coutk(str, len);
-}
-
 static void pl011_write(char a)
 {
 	/*
@@ -157,15 +152,15 @@ static void pl011_write(char a)
 	PL011_REG_WRITE(REG_UARTDR_OFFSET, a & 0xff);
 }
 
-static void pl011_putc(char a)
+void _libkvmplat_serial_putc(char a)
 {
-	if (a == '\n')
-		pl011_write('\r');
+	//if (a == '\n')
+	//	pl011_write('\r');
 	pl011_write(a);
 }
 
 /* Try to get data from pl011 UART without blocking */
-static int pl011_getc(void)
+int _libkvmplat_serial_getc(void)
 {
 	/*
 	 * Avoid using the UART before base address initialized,
@@ -181,22 +176,27 @@ static int pl011_getc(void)
 	return (int) (PL011_REG_READ(REG_UARTDR_OFFSET) & 0xff);
 }
 
-int ukplat_coutk(const char *buf, unsigned int len)
+void ensure_debug_init(void)
 {
-	for (unsigned int i = 0; i < len; i++)
-		pl011_putc(buf[i]);
-	return len;
+	pl011_uart_initialized = 1;
+	pl011_uart_bas = 0x09000000;
 }
 
-int ukplat_cink(char *buf, unsigned int maxlen)
+int ukplat_dbg_getc(void)
 {
-	int ret;
-	unsigned int num = 0;
+	int r;
 
-	while (num < maxlen && (ret = pl011_getc()) >= 0) {
-		*(buf++) = (char) ret;
-		num++;
-	}
+	ensure_debug_init();
 
-	return (int) num;
+	while ((r = _libkvmplat_serial_getc()) < 0)
+		;
+
+	return r;
+}
+
+void ukplat_dbg_putc(char c)
+{
+	ensure_debug_init();
+
+	_libkvmplat_serial_putc(c);
 }

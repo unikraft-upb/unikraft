@@ -45,6 +45,16 @@
 	(UK_HXDF_GRPBYTE | UK_HXDF_GRPWORD | UK_HXDF_GRPDWORD                  \
 	 | UK_HXDF_GRPQWORD)
 
+#if (defined __PTR_IS_64)
+#define HXD_ADDR_CHARS "16"
+#elif (defined __PTR_IS_32)
+#define HXD_ADDR_CHARS "8"
+#elif (defined __PTR_IS_16)
+#define HXD_ADDR_CHARS "4"
+#else
+#error "Unknown pointer size."
+#endif
+
 /**
  * Plot one hexdump data line
  * This function is called by _hxd()
@@ -202,7 +212,7 @@ static int _hxd(struct out_dev *o, const void *data, size_t len,
 		}
 
 		if (flags & UK_HXDF_ADDR) {
-			iret = outf(o, "%08"__PRIuptr"  ",
+			iret = outf(o, "%0"HXD_ADDR_CHARS __PRIuptr"  ",
 				    (__uptr)(i + addr0));
 			if (iret < 0)
 				return iret;

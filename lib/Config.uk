@@ -29,6 +29,10 @@ config HAVE_SYSCALL
        bool
        default n
 
+config HAVE_DEBUGGER
+       bool
+       default n
+
 config HAVE_X86PKU
 	bool
 	default n

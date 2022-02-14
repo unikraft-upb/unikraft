@@ -51,7 +51,7 @@ static inline uint8_t ioreg_read8(const volatile uint8_t *address)
 {
 	uint8_t value;
 
-	asm volatile ("ldrb %w0, [%1]" : "=r"(value) : "r"(address));
+	__asm__ __volatile__("ldrb %w0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
@@ -59,7 +59,7 @@ static inline uint16_t ioreg_read16(const volatile uint16_t *address)
 {
 	uint16_t value;
 
-	asm volatile ("ldrh %w0, [%1]" : "=r"(value) : "r"(address));
+	__asm__ __volatile__("ldrh %w0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
@@ -67,7 +67,7 @@ static inline uint32_t ioreg_read32(const volatile uint32_t *address)
 {
 	uint32_t value;
 
-	asm volatile ("ldr %w0, [%1]" : "=r"(value) : "r"(address));
+	__asm__ __volatile__("ldr %w0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
@@ -75,31 +75,31 @@ static inline uint64_t ioreg_read64(const volatile uint64_t *address)
 {
 	uint64_t value;
 
-	asm volatile ("ldr %0, [%1]" : "=r"(value) : "r"(address));
+	__asm__ __volatile__("ldr %0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
 static inline void ioreg_write8(const volatile uint8_t *address, uint8_t value)
 {
-	asm volatile ("strb %w0, [%1]" : : "rZ"(value), "r"(address));
+	__asm__ __volatile__("strb %w0, [%1]" : : "rZ"(value), "r"(address));
 }
 
 static inline void ioreg_write16(const volatile uint16_t *address,
 				 uint16_t value)
 {
-	asm volatile ("strh %w0, [%1]" : : "rZ"(value), "r"(address));
+	__asm__ __volatile__("strh %w0, [%1]" : : "rZ"(value), "r"(address));
 }
 
 static inline void ioreg_write32(const volatile uint32_t *address,
 				 uint32_t value)
 {
-	asm volatile ("str %w0, [%1]" : : "rZ"(value), "r"(address));
+	__asm__ __volatile__("str %w0, [%1]" : : "rZ"(value), "r"(address));
 }
 
 static inline void ioreg_write64(const volatile uint64_t *address,
 				 uint64_t value)
 {
-	asm volatile ("str %0, [%1]" : : "rZ"(value), "r"(address));
+	__asm__ __volatile__("str %0, [%1]" : : "rZ"(value), "r"(address));
 }
 
 static inline void _init_cpufeatures(void)
@@ -160,6 +160,11 @@ struct fpsimd_state {
 extern void fpsimd_save_state(uintptr_t ptr);
 extern void fpsimd_restore_state(uintptr_t ptr);
 
+static inline __sz arch_extregs_size(void)
+{
+	return sizeof(struct fpsimd_state);
+}
+
 static inline void save_extregs(struct sw_ctx *ctx)
 {
 	fpsimd_save_state(ctx->extregs);
@@ -192,6 +197,11 @@ static inline __sz arch_extregs_size(void)
 }
 
 #else /* !CONFIG_FPSIMD */
+static inline __sz arch_extregs_size(void)
+{
+	return 0;
+}
+
 static inline void save_extregs(struct sw_ctx *ctx __unused)
 {
 }

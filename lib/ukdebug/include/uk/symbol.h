@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ * Assertions
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *
+ *
+ * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,16 +32,44 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __PLAT_CMN_TRACE_H__
-#define __PLAT_CMN_TRACE_H__
 
-#include <uk/arch/lcpu.h>
+#ifndef __UKDEBUG_SYMBOL_H__
+#define __UKDEBUG_SYMBOL_H__
 
-void dump_regs(struct __regs *regs);
-void dump_mem(unsigned long addr);
-#if !__OMIT_FRAMEPOINTER__
-void stack_walk(void);
-void stack_walk_for_frame(unsigned long frame_base);
-#endif /* !__OMIT_FRAMEPOINTER__ */
+#include <uk/arch/types.h>
+#include <uk/essentials.h>
 
-#endif /* __PLAT_CMN_TRACE_H__ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct uk_symbol {
+	const char *name; /* Null-terminated */
+	__sz name_len;
+	unsigned long addr;
+};
+
+#ifdef CONFIG_DEBUG_EMBED_SYMBOLS
+/**
+ * Returns the nearest symbol below the supplied address.
+ *
+ * @param addr
+ *   Address to perform a symbol lookup for
+ * @param sym
+ *   Receives the information on the found symbol.
+ * @return
+ *   1 if a symbol could be found, 0 otherwise.
+ */
+int uk_resolve_symbol(unsigned long addr, struct uk_symbol *sym);
+#else
+static int uk_resolve_symbol(unsigned long addr __unused,
+		struct uk_symbol *sym __unused) {
+	return 0;
+}
+#endif /* CONFIG_DEBUG_EMBED_SYMBOLS */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __UKDEBUG_SYMBOL_H__ */
