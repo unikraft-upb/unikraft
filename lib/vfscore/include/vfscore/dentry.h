@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _OSV_DENTRY_H
-#define _OSV_DENTRY_H 1
+#ifndef _VFSCORE_DENTRY_H_
+#define _VFSCORE_DENTRY_H_
 
 #include <uk/mutex.h>
 #include <uk/list.h>
@@ -40,23 +40,48 @@
 struct vnode;
 
 struct dentry {
-	struct uk_hlist_node d_link;	/* link for hash list */
-	int		d_refcnt;	/* reference count */
-	char		*d_path;	/* pointer to path in fs */
-	struct vnode	*d_vnode;
-	struct mount	*d_mount;
-	struct dentry   *d_parent; /* pointer to parent */
-	struct uk_list_head d_names_link; /* link fo vnode::d_names */
-	struct uk_mutex	d_lock;
+	union {
+		/** Link into cache for fast lookup */
+		struct uk_list_head d_link;
+		/** Link into eviction list */
+		struct dentry *d_ev_link;
+	};
+	/** Hash over mount point and path */
+	unsigned int d_hash;
+	/** Set if dentry should not be kept open after last reference */
+	unsigned int d_donotcache : 1;
+
+	/** Number of references */
+	unsigned int d_refcnt;
+
+	/** Path in file system */
+	char *d_path;
+
+	/** Pointer to vnode */
+	struct vnode *d_vnode;
+	/** Link into vnode's names list */
+	struct uk_list_head d_names_link;
+
+	/** Pointer to mount point */
+	struct mount *d_mount;
+
+	/** Pointer to parent dentry */
+	struct dentry *d_parent;
+	/** List of child dentries */
 	struct uk_list_head d_child_list;
+	/** Link into the parent's dentry child_list */
 	struct uk_list_head d_child_link;
+
+	/** Lock to synchronize access */
+	struct uk_mutex d_lock;
 };
 
-struct dentry *dentry_alloc(struct dentry *parent_dp, struct vnode *vp, const char *path);
-struct dentry *dentry_lookup(struct mount *mp, char *path);
-int dentry_move(struct dentry *dp, struct dentry *parent_dp, char *path);
+struct dentry *dentry_alloc(struct dentry *parent_dp, struct vnode *vp,
+			    const char *path);
+struct dentry *dentry_lookup(struct mount *mp, const char *path);
+int dentry_move(struct dentry *dp, struct dentry *parent_dp, const char *path);
 void dentry_remove(struct dentry *dp);
 void dref(struct dentry *dp);
 void drele(struct dentry *dp);
 
-#endif /* _OSV_DENTRY_H */
+#endif /* _VFSCORE_DENTRY_H_ */
