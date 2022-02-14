@@ -143,7 +143,7 @@ static int do_epoll_create(struct uk_alloc *a, int flags)
 	 * It doesn't matter that all the dentries have the same path since
 	 * we never look them up.
 	 */
-	vfs_dentry = dentry_alloc(NULL, vfs_vnode, "/");
+	vfs_dentry = dentry_alloc(NULL, vfs_vnode, NULL);
 	if (unlikely(!vfs_dentry)) {
 		ret = -ENOMEM;
 		goto ERR_ALLOC_DENTRY;

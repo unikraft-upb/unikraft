@@ -608,7 +608,7 @@ static int pipe_fd_alloc(struct pipe_file *pipe_file, int flags)
 
 	uk_mutex_unlock(&p_vnode->v_lock);
 
-	p_dentry = dentry_alloc(NULL, p_vnode, "/");
+	p_dentry = dentry_alloc(NULL, p_vnode, NULL);
 	if (!p_dentry) {
 		ret = -ENOMEM;
 		goto ERR_ALLOC_DENTRY;

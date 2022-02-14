@@ -106,7 +106,7 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	}
 
 	/* Create an unnamed dentry */
-	vfs_dentry = dentry_alloc(NULL, vfs_vnode, "/");
+	vfs_dentry = dentry_alloc(NULL, vfs_vnode, NULL);
 	if (unlikely(!vfs_dentry)) {
 		ret = -ENOMEM;
 		goto ERR_ALLOC_DENTRY;
