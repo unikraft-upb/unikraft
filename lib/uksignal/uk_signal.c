@@ -459,18 +459,12 @@ void uk_execute_handler(siginfo_t sig)
 	 * This should never happen since
 	 * we never deliver ignored signals
 	 */
-	if (is_sig_ign(act)) {
-		uk_pr_debug("Ignored signal %d\n",
-				sig.si_signo);
-		ukplat_crash();
-	}
+	if (is_sig_ign(act))
+		UK_CRASH("Ignored signal %d\n", sig.si_signo);
 
 	/* our default handler is shutdown */
-	if (is_sig_dfl(act)) {
-		uk_pr_debug("Uncaught signal %d. Powering off.\n",
-				sig.si_signo);
-		ukplat_crash();
-	}
+	if (is_sig_dfl(act))
+		UK_CRASH("Uncaught signal %d. Powering off.\n", sig.si_signo);
 
 	ptr = _UK_TH_SIG;
 

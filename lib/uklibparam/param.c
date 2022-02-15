@@ -39,6 +39,7 @@
 #include <uk/assert.h>
 #include <uk/libparam.h>
 #include <uk/version.h>
+#include <uk/plat/bootstrap.h>
 
 #define ARRAY_SEP	 ' '
 #define LIB_ARG_SEP	 "--"
