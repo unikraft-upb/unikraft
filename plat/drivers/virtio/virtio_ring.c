@@ -38,6 +38,7 @@
 #include <uk/print.h>
 #include <uk/errptr.h>
 #include <uk/plat/common/cpu.h>
+#include <uk/plat/lcpu.h>
 #include <uk/sglist.h>
 #include <uk/arch/atomic.h>
 #include <uk/plat/io.h>
@@ -50,7 +51,16 @@
 
 struct virtqueue_desc_info {
 	void *cookie;
-	__u16 desc_count;
+};
+
+union virtqueue_free_list {
+	struct {
+		/* Number of available descriptors in virtqueue */
+		__u16 len;
+		/* Index of first descriptor in list */
+		__u16 head;
+	};
+	__u32 _atomic;
 };
 
 struct virtqueue_vring {
@@ -59,10 +69,8 @@ struct virtqueue_vring {
 	struct vring vring;
 	/* Reference to the vring */
 	void   *vring_mem;
-	/* Keep track of available descriptors */
-	__u16 desc_avail;
-	/* Index of the next available slot */
-	__u16 head_free_desc;
+	/* List of free descriptors */
+	union virtqueue_free_list free_list;
 	/* Index of the last used descriptor by the host */
 	__u16 last_used_desc_idx;
 	/* Cookie to identify driver buffer */
@@ -74,9 +82,7 @@ struct virtqueue_vring {
  */
 static inline void virtqueue_ring_update_avail(struct virtqueue_vring *vrq,
 					       __u16 idx);
-static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
-					 __u16 head_idx);
-static inline int virtqueue_buffer_enqueue_segments(
+static inline void virtqueue_buffer_enqueue_segments(
 						    struct virtqueue_vring *vrq,
 						    __u16 head,
 						    struct uk_sglist *sg,
@@ -84,6 +90,19 @@ static inline int virtqueue_buffer_enqueue_segments(
 						    __u16 write_bufs);
 static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
 				 __u16 align);
+
+//#define UK_DEBUG_TRACE
+#include <uk/trace.h>
+
+UK_TRACEPOINT(trace_vq_intr, "%p %d", void *, int);
+UK_TRACEPOINT(trace_vq_intr_ret, "%p %d", void *, int);
+
+UK_TRACEPOINT(trace_vr_enqueue, "%p %u->%u %u %p %u", void *, __u16, __u16,
+	      unsigned, __paddr_t, unsigned);
+UK_TRACEPOINT(trace_vr_dequeue, "%p %u->%u %p %u", void *, __u16, __u16,
+		__paddr_t, unsigned);
+UK_TRACEPOINT(trace_vr_set_head, "%p from=%u to=%u", void *, __u16, __u16);
+UK_TRACEPOINT(trace_vr_avail, "%p %u", void *, __u16);
 
 /**
  * Driver implementation
@@ -111,6 +130,7 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 		if (vrq->vring.avail->flags | VRING_AVAIL_F_NO_INTERRUPT) {
 			vrq->vring.avail->flags &=
 				(~VRING_AVAIL_F_NO_INTERRUPT);
+
 			/**
 			 * We enabled the interrupts. We ensure it using the
 			 * memory barrier and check if there are any further
@@ -153,28 +173,77 @@ static inline void virtqueue_ring_update_avail(struct virtqueue_vring *vrq,
 	vrq->vring.avail->idx++;
 }
 
-static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
-					__u16 head_idx)
+static __u16 virtqueue_desc_alloc(struct virtqueue_vring *vqr, __u16 n)
 {
+	union virtqueue_free_list old, new;
+	__u16 i, idx;
+
+	do {
+		old._atomic = UK_READ_ONCE(vqr->free_list._atomic);
+		if (old.len < n)
+			return VIRTQUEUE_MAX_SIZE;
+
+		/* Walk the free list to find the new head */
+		for (i = 0, idx = old.head; i < n; i++) {
+			UK_ASSERT(idx < vqr->vring.num);
+			idx = vqr->vring.desc[idx].next;
+		}
+
+		new.head = idx;
+		new.len = old.len - n;
+
+		UK_ASSERT(new.len > 0 || new.head == VIRTQUEUE_MAX_SIZE);
+	} while (ukarch_compare_exchange_sync(&vqr->free_list._atomic,
+			old._atomic, new._atomic) != new._atomic);
+
+	trace_vr_set_head(vqr, old.head, new.head);
+
+	return old.head;
+}
+
+static __u16 virtqueue_desc_free(struct virtqueue_vring *vqr, __u16 idx)
+{
+	union virtqueue_free_list old, new;
 	struct vring_desc *desc;
-	struct virtqueue_desc_info *vq_info;
+	__u16 len = 1;
 
-	desc = &vrq->vring.desc[head_idx];
-	vq_info = &vrq->vq_info[head_idx];
-	vrq->desc_avail += vq_info->desc_count;
-	vq_info->desc_count--;
+	new.head = idx;
 
-	while (desc->flags & VRING_DESC_F_NEXT) {
-		desc = &vrq->vring.desc[desc->next];
-		vq_info->desc_count--;
+	UK_ASSERT(idx < vqr->vring.num);
+	desc = &vqr->vring.desc[idx];
+
+	/* Walk provided list to find its last descriptor */
+	while (1) {
+		trace_vr_dequeue(vqr, idx, desc->next, desc->addr, desc->len);
+		desc->addr = 0x0;
+		desc->len = 0x0;
+		idx = desc->next;
+
+		if (!(desc->flags & VRING_DESC_F_NEXT))
+			break;
+
+		UK_ASSERT(desc->next < vqr->vring.num);
+		desc = &vqr->vring.desc[desc->next];
+		len++;
 	}
 
-	/* The value should be empty */
-	UK_ASSERT(vq_info->desc_count == 0);
+	UK_ASSERT(len <= vqr->vring.num);
 
-	/* Appending the descriptor to the head of list */
-	desc->next = vrq->head_free_desc;
-	vrq->head_free_desc = head_idx;
+	/* Try to insert the given descriptor list to the free list */
+	do {
+		old._atomic = UK_READ_ONCE(vqr->free_list._atomic);
+
+		UK_ASSERT(old.len > 0 || old.head == VIRTQUEUE_MAX_SIZE);
+		UK_ASSERT(old.len <= vqr->vring.num - len);
+
+		new.len = old.len + len;
+		desc->next = old.head;
+	} while (ukarch_compare_exchange_sync(&vqr->free_list._atomic,
+			old._atomic, new._atomic) != new._atomic);
+
+	trace_vr_set_head(vqr, old.head, new.head);
+
+	return new.len;
 }
 
 int virtqueue_notify_enabled(struct virtqueue *vq)
@@ -187,19 +256,21 @@ int virtqueue_notify_enabled(struct virtqueue *vq)
 	return ((vrq->vring.used->flags & VRING_USED_F_NO_NOTIFY) == 0);
 }
 
-static inline int virtqueue_buffer_enqueue_segments(
+static inline void virtqueue_buffer_enqueue_segments(
 		struct virtqueue_vring *vrq,
 		__u16 head, struct uk_sglist *sg, __u16 read_bufs,
 		__u16 write_bufs)
 {
-	int i = 0, total_desc = 0;
+	__u16 i, idx;
+	__u32 total_desc;
 	struct uk_sglist_seg *segs;
-	__u16 idx = 0;
 
 	total_desc = read_bufs + write_bufs;
 
 	for (i = 0, idx = head; i < total_desc; i++) {
 		segs = &sg->sg_segs[i];
+
+		UK_ASSERT(idx < vrq->vring.num);
 		vrq->vring.desc[idx].addr = segs->ss_paddr;
 		vrq->vring.desc[idx].len = segs->ss_len;
 		vrq->vring.desc[idx].flags = 0;
@@ -208,9 +279,13 @@ static inline int virtqueue_buffer_enqueue_segments(
 
 		if (i < total_desc - 1)
 			vrq->vring.desc[idx].flags |= VRING_DESC_F_NEXT;
+
+		trace_vr_enqueue(&vrq->vq, idx, vrq->vring.desc[idx].next,
+				 vrq->vring.desc[idx].flags,
+				 segs->ss_paddr, segs->ss_len);
+
 		idx = vrq->vring.desc[idx].next;
 	}
-	return idx;
 }
 
 int virtqueue_hasdata(struct virtqueue *vq)
@@ -242,11 +317,18 @@ int virtqueue_ring_interrupt(void *obj)
 
 	UK_ASSERT(vq);
 
-	if (!virtqueue_hasdata(vq))
+	trace_vq_intr(vq, virtqueue_hasdata(vq));
+
+	if (!virtqueue_hasdata(vq)) {
+		trace_vq_intr_ret(vq, rc);
 		return rc;
+	}
 
 	if (likely(vq->vq_callback))
 		rc = vq->vq_callback(vq, vq->priv);
+
+	trace_vq_intr_ret(vq, rc);
+
 	return rc;
 }
 
@@ -294,75 +376,75 @@ unsigned int virtqueue_vring_get_num(struct virtqueue *vq)
 
 int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 {
-	struct virtqueue_vring *vrq = NULL;
-	__u16 used_idx, head_idx;
+	struct virtqueue_vring *vqr = NULL;
 	struct vring_used_elem *elem;
+	__u16 used_idx, head_idx;
 
 	UK_ASSERT(vq);
 	UK_ASSERT(cookie);
-	vrq = to_virtqueue_vring(vq);
+	vqr = to_virtqueue_vring(vq);
 
 	/* No new descriptor since last dequeue operation */
 	if (!virtqueue_hasdata(vq))
 		return -ENOMSG;
-	used_idx = vrq->last_used_desc_idx++ & (vrq->vring.num - 1);
-	elem = &vrq->vring.used->ring[used_idx];
-	/**
-	 * We are reading from the used descriptor information updated by the
+
+	used_idx = vqr->last_used_desc_idx++ & (vqr->vring.num - 1);
+	elem = &vqr->vring.used->ring[used_idx];
+
+	/* We are reading from the used descriptor information updated by the
 	 * host.
+	 *
+	 * TODO: Does this make sense?
 	 */
 	rmb();
+
 	head_idx = elem->id;
 	if (len)
 		*len = elem->len;
-	*cookie = vrq->vq_info[head_idx].cookie;
-	virtqueue_detach_desc(vrq, head_idx);
-	vrq->vq_info[head_idx].cookie = NULL;
-	return (vrq->vring.num - vrq->desc_avail);
+
+	*cookie = vqr->vq_info[head_idx].cookie;
+
+	return (vqr->vring.num - virtqueue_desc_free(vqr, head_idx));
 }
 
 int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 			     struct uk_sglist *sg, __u16 read_bufs,
 			     __u16 write_bufs)
 {
-	__u32 total_desc = 0;
-	__u16 head_idx = 0, idx = 0;
-	struct virtqueue_vring *vrq = NULL;
+	struct virtqueue_vring *vqr;
+	__u16 head_idx;
+	__u32 total_desc;
 
 	UK_ASSERT(vq);
+	vqr = to_virtqueue_vring(vq);
 
-	vrq = to_virtqueue_vring(vq);
 	total_desc = read_bufs + write_bufs;
-	if (unlikely(total_desc < 1 || total_desc > vrq->vring.num)) {
-		uk_pr_err("%"__PRIu32" invalid number of descriptor\n",
+	if (unlikely(total_desc < 1 || total_desc > vqr->vring.num)) {
+		uk_pr_err("Invalid number of descriptors: %"__PRIu32"\n",
 			  total_desc);
 		return -EINVAL;
-	} else if (vrq->desc_avail < total_desc) {
-		uk_pr_err("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
-			  vrq->desc_avail, total_desc);
+	}
+
+	/* Allocate descriptors from the virtqueue */
+	head_idx = virtqueue_desc_alloc(vqr, total_desc);
+	if (unlikely(head_idx == VIRTQUEUE_MAX_SIZE)) {
+		//uk_pr_err("Not enough descriptors available: %"__PRIu32"\n",
+		//	  total_desc);
 		return -ENOSPC;
 	}
-	/* Get the head of free descriptor */
-	head_idx = vrq->head_free_desc;
+
+	UK_ASSERT(head_idx < vqr->vring.num);
 	UK_ASSERT(cookie);
+
 	/* Additional information to reconstruct the data buffer */
-	vrq->vq_info[head_idx].cookie = cookie;
-	vrq->vq_info[head_idx].desc_count = total_desc;
+	vqr->vq_info[head_idx].cookie = cookie;
 
-	/**
-	 * We separate the descriptor management to enqueue segment(s).
-	 */
-	idx = virtqueue_buffer_enqueue_segments(vrq, head_idx, sg,
-			read_bufs, write_bufs);
-	/* Metadata maintenance for the virtqueue */
-	vrq->head_free_desc = idx;
-	vrq->desc_avail -= total_desc;
+	virtqueue_buffer_enqueue_segments(vqr, head_idx, sg, read_bufs,
+					  write_bufs);
 
-	uk_pr_debug("Old head:%d, new head:%d, total_desc:%d\n",
-		    head_idx, idx, total_desc);
+	virtqueue_ring_update_avail(vqr, head_idx);
 
-	virtqueue_ring_update_avail(vrq, head_idx);
-	return vrq->desc_avail;
+	return 0;
 }
 
 static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
@@ -372,11 +454,14 @@ static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
 
 	vring_init(&vrq->vring, nr_desc, vrq->vring_mem, align);
 
-	vrq->desc_avail = vrq->vring.num;
-	vrq->head_free_desc = 0;
+	vrq->free_list.len = vrq->vring.num;
+	vrq->free_list.head = 0;
 	vrq->last_used_desc_idx = 0;
-	for (i = 0; i < nr_desc - 1; i++)
+	for (i = 0; i < nr_desc - 1; i++) {
+		vrq->vring.desc[i].addr = 0x0;
+		vrq->vring.desc[i].len = 0x0;
 		vrq->vring.desc[i].next = i + 1;
+	}
 	/**
 	 * When we reach this descriptor we have completely used all the
 	 * descriptor in the vring.
@@ -455,5 +540,5 @@ int virtqueue_is_full(struct virtqueue *vq)
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return (vrq->desc_avail == 0);
+	return (vrq->free_list.len == 0);
 }
