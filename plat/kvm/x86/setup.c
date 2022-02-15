@@ -74,16 +74,16 @@ static void _convert_mbinfo(struct multiboot_info *mi)
 	/*
 	 * Look for the first chunk of memory at PLATFORM_MEM_START.
 	 */
+	uk_pr_debug("Multiboot memory regions:\n");
 	for (offset = 0; offset < mi->mmap_length;
 	     offset += m->size + sizeof(m->size)) {
 		m = (void *)(__uptr)(mi->mmap_addr + offset);
-		if (m->addr == PLATFORM_MEM_START
-		    && m->type == MULTIBOOT_MEMORY_AVAILABLE) {
-			break;
-		}
-	}
-	UK_ASSERT(offset < mi->mmap_length);
 
+		uk_pr_debug("%llx - %llx (%llu bytes)\n", m->addr,
+			    m->addr + m->len - 1, m->len);
+	}
+
+#ifndef CONFIG_PAGING
 	/*
 	 * Cap our memory size to PLATFORM_MAX_MEM_SIZE for which the initial
 	 * static page table defines mappings for. Don't apply the limit when
@@ -93,6 +93,7 @@ static void _convert_mbinfo(struct multiboot_info *mi)
 	bootinfo.max_addr = m->addr + m->len;
 	if (bootinfo.max_addr > PLATFORM_MAX_MEM_ADDR)
 		bootinfo.max_addr = PLATFORM_MAX_MEM_ADDR;
+#endif /* !CONFIG_PAGING */
 	UK_ASSERT(bootinfo.max_addr >= (size_t) __END);
 
 	/*
