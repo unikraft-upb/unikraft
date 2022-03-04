@@ -38,8 +38,13 @@
 extern "C" {
 #endif
 
-extern int *_nolibc_errno(void);
-#define errno (*_nolibc_errno())
+#include <uk/config.h>
+
+#if CONFIG_HAVE_SCHED
+extern __thread int errno;
+#else
+extern int errno;
+#endif /* !CONFIG_HAVE_SCHED */
 
 /* Retrieved from: https://www.freebsd.org/cgi/man.cgi?query=errno&sektion=2 */
 #define EPERM             1 /* Operation not permitted */
