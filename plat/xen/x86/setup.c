@@ -185,6 +185,7 @@ static inline void _init_mem(void)
 }
 
 void _libxenplat_x86entry(void *start_info) __noreturn;
+void _update_boot_time(void);
 
 void _libxenplat_x86entry(void *start_info)
 {
@@ -196,6 +197,8 @@ void _libxenplat_x86entry(void *start_info)
 	uk_pr_info("Entering from Xen (x86, PV)...\n");
 
 	_init_shared_info(); /* remaps shared info */
+
+	_update_boot_time();
 
 	strncpy(cmdline, (char *)HYPERVISOR_start_info->cmd_line,
 		MAX_GUEST_CMDLINE);

@@ -61,6 +61,7 @@ struct shadow_time_info {
 static struct timespec shadow_ts;
 
 static uint32_t shadow_ts_version;
+static __nsec boot_timestamp;
 
 static struct shadow_time_info shadow;
 
@@ -157,7 +158,8 @@ __nsec ukplat_monotonic_clock(void)
 	do {
 		local_time_version = shadow.version;
 		rmb();
-		time = shadow.system_timestamp + get_nsec_offset();
+		time = shadow.system_timestamp - boot_timestamp +
+			get_nsec_offset();
 		if (!time_values_up_to_date())
 			get_time_values_from_xen();
 		rmb();
@@ -181,7 +183,7 @@ static void update_wallclock(void)
 
 __nsec ukplat_wall_clock(void)
 {
-	__nsec ret = ukplat_monotonic_clock();
+	__nsec ret = ukplat_monotonic_clock() + boot_timestamp;
 
 	if (!wc_values_up_to_date())
 		update_wallclock();
@@ -197,7 +199,7 @@ void time_block_until(__snsec until)
 	UK_ASSERT(irqs_disabled());
 
 	if ((__snsec) ukplat_monotonic_clock() < until) {
-		HYPERVISOR_set_timer_op(until);
+		HYPERVISOR_set_timer_op(until + boot_timestamp);
 		ukplat_lcpu_halt_irq();
 		HYPERVISOR_set_timer_op(0);
 	}
@@ -208,10 +210,15 @@ static void timer_handler(evtchn_port_t ev __unused,
 {
 	__nsec until = ukplat_monotonic_clock() + UKPLAT_TIME_TICK_NSEC;
 
-	HYPERVISOR_set_timer_op(until);
+	HYPERVISOR_set_timer_op(until + boot_timestamp);
 }
 
 
+void _update_boot_time(void)
+{
+	UK_ASSERT(boot_timestamp == 0);
+	boot_timestamp = ukplat_monotonic_clock();
+}
 
 static evtchn_port_t port;
 void ukplat_time_init(void)
