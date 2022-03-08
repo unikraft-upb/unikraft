@@ -163,6 +163,22 @@ struct uk_alloc *ukplat_memallocator_get(void);
  */
 void ukplat_stack_set_current_thread(void *thread_addr);
 
+/**
+ * Returns the maximum physical address in the system.
+ *
+ * NOTE: Not the whole memory range until this address may be accessible.
+ *
+ * @return Maximum physical address
+ */
+__paddr_t ukplat_physmem_max_addr(void);
+
+/**
+ * Returns the amount of physical memory installed in the system.
+ *
+ * @return Amount of installed physical memory
+ */
+__sz ukplat_physmem_total(void);
+
 #ifdef __cplusplus
 }
 #endif

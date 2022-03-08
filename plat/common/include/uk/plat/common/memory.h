@@ -33,6 +33,8 @@
 #ifndef __PLAT_CMN_MEMORY_H__
 #define __PLAT_CMN_MEMORY_H__
 
+#include <uk/arch/types.h>
+
 /**
  * Initializes the platform memory mappings which require an allocator. This
  * function must always be called after initializing a memory allocator and
@@ -41,5 +43,15 @@
  * @return 0 on success, < 0 otherwise
  */
 int _ukplat_mem_mappings_init(void);
+
+/**
+ * Maximum physical address in the system
+ */
+extern __paddr_t physmem_max_addr;
+
+/**
+ * Amount of physical memory installed in the system
+ */
+extern __sz physmem_total;
 
 #endif /* __PLAT_CMN_MEMORY_H__ */

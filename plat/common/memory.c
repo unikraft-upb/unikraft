@@ -55,3 +55,19 @@ struct uk_alloc *ukplat_memallocator_get(void)
 {
 	return plat_allocator;
 }
+
+/* Maximum physical address in the system */
+__paddr_t physmem_max_addr;
+
+__paddr_t ukplat_physmem_max_addr(void)
+{
+	return physmem_max_addr;
+}
+
+/* Amount of physical memory in the system */
+__sz physmem_total;
+
+__sz ukplat_physmem_total(void)
+{
+	return physmem_total;
+}
