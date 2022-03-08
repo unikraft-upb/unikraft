@@ -28,6 +28,7 @@
 
 #include <string.h>
 #include <uk/plat/common/sections.h>
+#include <uk/plat/common/memory.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <kvm/config.h>
@@ -81,6 +82,12 @@ static void _convert_mbinfo(struct multiboot_info *mi)
 
 		uk_pr_debug("%llx - %llx (%llu bytes)\n", m->addr,
 			    m->addr + m->len - 1, m->len);
+
+		if ((m->addr + m->len) > physmem_max_addr)
+			physmem_max_addr = m->addr + m->len;
+
+		if (m->type == MULTIBOOT_MEMORY_AVAILABLE)
+			physmem_total += m->len;
 	}
 
 #ifndef CONFIG_PAGING
