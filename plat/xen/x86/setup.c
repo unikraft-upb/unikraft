@@ -74,6 +74,7 @@
 #include <uk/plat/config.h>
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
+#include <uk/plat/common/memory.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 
@@ -135,6 +136,9 @@ static inline void _init_mem(void)
 
 	if (max_pfn >= MAX_MEM_SIZE / __PAGE_SIZE)
 		max_pfn = MAX_MEM_SIZE / __PAGE_SIZE - 1;
+
+	physmem_max_addr = max_pfn * __PAGE_SIZE;
+	physmem_total = max_pfn * __PAGE_SIZE;
 
 	uk_pr_info("     start_pfn: %lx\n", start_pfn);
 	uk_pr_info("       max_pfn: %lx\n", max_pfn);
