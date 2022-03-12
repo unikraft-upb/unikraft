@@ -39,6 +39,7 @@
 #include <uk/page.h>
 
 #ifdef DRUNTIME
+#include <uk/arch/limits.h>
 #include <uk/essentials.h>
 
 #define size_to_num_pages(size) \
