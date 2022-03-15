@@ -75,7 +75,7 @@ static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
 	struct uk_blkdev_queue *queue;
 	struct blkfront_grefs_pool *grefs_pool;
-	int rc = 0;
+	int rc __maybe_unused = 0;
 #endif
 
 	UK_ASSERT(blkfront_req != NULL);
@@ -135,7 +135,7 @@ static void blkfront_request_reset_grefs(struct blkfront_request *req)
 	uint16_t gref_id = 0;
 	struct blkfront_gref *gref_elem;
 	uint16_t nb_segments;
-	int rc;
+	int rc __maybe_unused;
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
 	struct uk_blkdev_queue *queue;
 	struct blkfront_grefs_pool *grefs_pool;
@@ -187,7 +187,7 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 	uintptr_t start_sector;
 	struct blkfront_gref *ref_elem;
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
-	int rc;
+	int rc __maybe_unused;
 #endif
 
 	UK_ASSERT(ring_req);
@@ -381,7 +381,7 @@ err_out:
 	goto out;
 }
 
-static int blkfront_submit_request(struct uk_blkdev *blkdev,
+static int blkfront_submit_request(struct uk_blkdev *blkdev __maybe_unused,
 		struct uk_blkdev_queue *queue,
 		struct uk_blkreq *req)
 {
@@ -506,7 +506,7 @@ out:
 	return rc;
 }
 
-static int blkfront_complete_reqs(struct uk_blkdev *blkdev,
+static int blkfront_complete_reqs(struct uk_blkdev *blkdev __maybe_unused,
 		struct uk_blkdev_queue *queue)
 {
 	struct uk_blkreq *req;
@@ -577,7 +577,7 @@ static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 
 static void blkfront_ring_fini(struct uk_blkdev_queue *queue)
 {
-	int rc;
+	int rc __maybe_unused;
 
 	if (queue->ring_ref != GRANT_INVALID_REF) {
 		rc = gnttab_end_access(queue->ring_ref);
@@ -593,7 +593,7 @@ static void blkfront_queue_gref_pool_release(struct uk_blkdev_queue *queue)
 {
 	struct blkfront_grefs_pool *grefs_pool;
 	struct blkfront_gref *ref_elem;
-	int rc;
+	int rc __maybe_unused;
 
 	UK_ASSERT(queue);
 	grefs_pool = &queue->ref_pool;
@@ -711,7 +711,7 @@ err_out:
 	return ERR2PTR(err);
 }
 
-static int blkfront_queue_release(struct uk_blkdev *blkdev,
+static int blkfront_queue_release(struct uk_blkdev *blkdev __maybe_unused,
 		struct uk_blkdev_queue *queue)
 {
 	UK_ASSERT(blkdev != NULL);
@@ -728,7 +728,7 @@ static int blkfront_queue_release(struct uk_blkdev *blkdev,
 	return 0;
 }
 
-static int blkfront_queue_intr_enable(struct uk_blkdev *blkdev,
+static int blkfront_queue_intr_enable(struct uk_blkdev *blkdev __maybe_unused,
 		struct uk_blkdev_queue *queue)
 {
 	int rc = 0;
@@ -753,7 +753,7 @@ static int blkfront_queue_intr_enable(struct uk_blkdev *blkdev,
 	return rc;
 }
 
-static int blkfront_queue_intr_disable(struct uk_blkdev *blkdev,
+static int blkfront_queue_intr_disable(struct uk_blkdev *blkdev __maybe_unused,
 		struct uk_blkdev_queue *queue)
 {
 	UK_ASSERT(blkdev);
