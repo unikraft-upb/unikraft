@@ -31,7 +31,7 @@
 #include <xen-x86/hypercall.h>
 
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
-#define NR_GRANT_FRAMES         4
+#define NR_GRANT_FRAMES		CONFIG_XEN_GNTTAB_FRAMES
 #define NR_GRANT_ENTRIES \
 	(NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_v1_t))
 

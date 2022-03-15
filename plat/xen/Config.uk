@@ -76,6 +76,11 @@ config XEN_GNTTAB
 	help
 		Support grant table operations
 
+config XEN_GNTTAB_FRAMES
+	int
+	depends on XEN_GNTTAB
+	default 4
+
 config XEN_XENBUS
 	bool "Xenbus/XenStore driver"
 	default y if XEN_PV
@@ -161,4 +166,27 @@ config XEN_SHUTDOWN
 		via the XenStore entry `control/shutdown`. This
 		option enables handling on hypervisor shutdown
 		requests.
+
+config XEN_MAX_STATIC_MEMORY
+	int "Maximum static memory in MiB"
+	depends on XEN_PV
+	default 1024
+	help
+		Xen creates a boot page table to map the first X amount of
+		physical memory in a 1:1 mapping. This option configures how
+		much memory the page table should be able to cover at most. If
+		more memory is needed paging must be activated. Note: Choose
+		as small as possible as page table memory is statically
+		reserved in the .bss segment.
+
+config XEN_PREMAP_MEMORY
+	int "Premapped heap memory in MiB"
+	depends on XEN_PV
+	default 16
+	help
+		We actually only map this amount of memory in addition to the
+		kernel image during boot and map the rest of the static memory
+		on demand. This saves boot time as Xen does not have to
+		validate all PTEs at once.
+
 endif

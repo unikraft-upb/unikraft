@@ -204,12 +204,12 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
 		if (ref_elem->reusable_gref) {
 			rc = gnttab_update_grant(ref_elem->ref, otherend_id,
-				virtual_to_mfn(data), ring_req->operation);
+				xpg_virt_to_mfn(data), ring_req->operation);
 			UK_ASSERT(rc);
 		} else
 #endif
 		ref_elem->ref = gnttab_grant_access(otherend_id,
-				virtual_to_mfn(data), ring_req->operation);
+				xpg_virt_to_mfn(data), ring_req->operation);
 
 		UK_ASSERT(ref_elem->ref != GRANT_INVALID_REF);
 		ring_req->seg[gref_index].gref = ref_elem->ref;

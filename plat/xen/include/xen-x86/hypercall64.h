@@ -37,12 +37,9 @@
 
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
+#include <uk/arch/paging.h>
 #include <xen/xen.h>
 #include <xen/sched.h>
-
-#define PAGE_SHIFT       __PAGE_SHIFT
-#define PAGE_MASK        __PAGE_MASK
-#define PAGE_SIZE        __PAGE_SIZE
 
 #define STACK_SIZE_PAGE_ORDER  __STACK_SIZE_PAGE_ORDER
 #define STACK_SIZE             __STACK_SIZE
@@ -55,7 +52,7 @@
 typedef struct __pte pte_t;
 #define __pte(x) npte(x)
 
-extern char hypercall_page[__PAGE_SIZE];
+extern char hypercall_page[PAGE_SIZE];
 
 #define _hypercall0(type, name)			\
 ({						\
