@@ -41,8 +41,11 @@
 struct mmap_addr {
 	void *begin;
 	void *end;
+	size_t rem_len;
 	struct mmap_addr *next;
 };
+
+static size_t mmap_wasted_size = 0;
 
 static struct mmap_addr *mmap_addr;
 
@@ -108,12 +111,15 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 		return (void *) -1;
 	}
 
+	uk_pr_debug("mmap: %p %lu %lu\n", mem, len, mmap_wasted_size);
+
 	/* The caller expects the memory to be zeroed */
 	memset(mem, 0, len);
 
 	new->begin = mem;
 	new->end = mem + len;
 	new->next = NULL;
+	new->rem_len = len;
 	if (!mmap_addr)
 		mmap_addr = new;
 	else
@@ -150,8 +156,22 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 			 * In that case, pretend we have done it and hope
 			 * everything will be fine
 			 */
-			if (len != (__uptr)tmp->end - (__uptr)tmp->begin)
+			if (len != tmp->rem_len) {
+				UK_ASSERT(len < tmp->rem_len);
+				mmap_wasted_size += len;
+				tmp->rem_len -= len;
 				return 0;
+			}
+
+			if (len < (__uptr)(tmp->end - tmp->begin)) {
+				mmap_wasted_size -=
+					(tmp->end - tmp->begin) - len;
+
+				uk_pr_debug("munmap: %p %lu %lu\n",
+					    tmp->begin,
+					    tmp->end - tmp->begin,
+					    mmap_wasted_size);
+			}
 
 			/* Caller wants to unmap the whole region. Easy! */
 			if (!prev)
