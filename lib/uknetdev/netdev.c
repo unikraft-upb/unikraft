@@ -38,6 +38,7 @@
 #include <uk/netdev.h>
 #include <uk/print.h>
 #include <uk/libparam.h>
+#include <uk/thread_attr.h>
 
 struct uk_netdev_list uk_netdev_list =
 	UK_TAILQ_HEAD_INITIALIZER(uk_netdev_list);
@@ -381,6 +382,7 @@ static int _create_event_handler(uk_netdev_queue_event_t callback,
 	UK_ASSERT(h);
 	UK_ASSERT(callback || (!callback && !callback_cookie));
 #ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
+	struct uk_thread_attr a;
 	UK_ASSERT(!h->dispatcher);
 #endif
 
@@ -406,8 +408,11 @@ static int _create_event_handler(uk_netdev_queue_event_t callback,
 		h->dispatcher_name = NULL;
 	}
 
+	uk_thread_attr_init(&a);
+	uk_thread_attr_set_stack_size(&a, 0); /* set smallest stack size */
+
 	h->dispatcher = uk_sched_thread_create(h->dispatcher_s,
-					       h->dispatcher_name, NULL,
+					       h->dispatcher_name, &a,
 					       _dispatcher, h);
 	if (!h->dispatcher) {
 		if (h->dispatcher_name)
