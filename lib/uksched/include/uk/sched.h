@@ -94,7 +94,7 @@ struct uk_sched {
 
 	/* internal */
 	bool threads_started;
-	struct uk_thread idle;
+	struct uk_thread *idle;
 	struct uk_thread_list exited_threads;
 	struct ukplat_ctx_callbacks plat_ctx_cbs;
 	struct uk_alloc *allocator;
@@ -210,7 +210,7 @@ void uk_sched_idle_init(struct uk_sched *sched,
 static inline struct uk_thread *uk_sched_get_idle(struct uk_sched *s)
 {
 	UK_ASSERT(s);
-	return &s->idle;
+	return s->idle;
 }
 
 #define uk_sched_init(s, yield_func, \

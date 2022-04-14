@@ -142,7 +142,7 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
 void uk_sched_start(struct uk_sched *sched)
 {
 	UK_ASSERT(sched != NULL);
-	ukplat_thread_ctx_start(&sched->plat_ctx_cbs, sched->idle.ctx);
+	ukplat_thread_ctx_start(&sched->plat_ctx_cbs, sched->idle->ctx);
 }
 
 static void *create_stack(struct uk_alloc *allocator)
@@ -180,13 +180,14 @@ void uk_sched_idle_init(struct uk_sched *sched,
 
 	UK_ASSERT(sched != NULL);
 
+	idle = uk_malloc(sched->allocator, sizeof(struct uk_thread));
+	UK_ASSERT(idle != NULL);
+
 	if (stack == NULL)
 		stack = create_stack(sched->allocator);
 	UK_ASSERT(stack != NULL);
 	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
 		goto out_crash;
-
-	idle = &sched->idle;
 
 	rc = uk_thread_init(idle,
 			&sched->plat_ctx_cbs, sched->allocator,
@@ -195,6 +196,7 @@ void uk_sched_idle_init(struct uk_sched *sched,
 		goto out_crash;
 
 	idle->sched = sched;
+	sched->idle = idle;
 	return;
 
 out_crash:

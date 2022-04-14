@@ -213,10 +213,9 @@ static void idle_thread_fn(void *unused __unused)
 	s->threads_started = true;
 	ukplat_lcpu_enable_irq();
 
-	while (1) {
-		uk_thread_block(current);
-		schedcoop_schedule(s);
-	}
+	/* Just exit so the next thread is scheduled */
+	uk_thread_detach(current);
+	s->idle = NULL;
 }
 
 static void schedcoop_yield(struct uk_sched *s)
