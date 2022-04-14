@@ -48,10 +48,10 @@ static void stack_push(unsigned long *sp, unsigned long value)
 	*((unsigned long *) *sp) = value;
 }
 
-static void init_sp(unsigned long *sp, char *stack,
+static void init_sp(unsigned long *sp, char *stack, __sz stack_size,
 		void (*function)(void *), void *data)
 {
-	*sp = (unsigned long) stack + STACK_SIZE;
+	*sp = (unsigned long) stack + stack_size;
 
 #if defined(__X86_64__)
 	/* Must ensure that (%rsp + 8) is 16-byte aligned
@@ -109,7 +109,7 @@ extern const struct uk_thread_inittab_entry _uk_thread_inittab_end;
 
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
-		const char *name, void *stack, void *tls,
+		const char *name, void *stack, __sz stack_size, void *tls,
 		void (*function)(void *), void *arg)
 {
 	unsigned long sp;
@@ -171,7 +171,7 @@ int uk_thread_init(struct uk_thread *thread,
 	 *       function (e.g., encapsulation), we prepare the stack here
 	 *       with the final setup
 	 */
-	init_sp(&sp, stack, thread->entry, thread->arg);
+	init_sp(&sp, stack, stack_size, thread->entry, thread->arg);
 
 	/* Platform specific context initialization */
 	ukplat_thread_ctx_init(cbs, thread->ctx, sp,

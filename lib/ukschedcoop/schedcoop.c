@@ -240,7 +240,7 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	UK_TAILQ_INIT(&prv->thread_list);
 	UK_TAILQ_INIT(&prv->sleeping_threads);
 
-	uk_sched_idle_init(sched, NULL, idle_thread_fn);
+	uk_sched_idle_init(sched, NULL, __PAGE_SIZE, idle_thread_fn);
 
 	uk_sched_init(sched,
 			schedcoop_yield,

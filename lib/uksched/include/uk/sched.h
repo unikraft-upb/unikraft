@@ -205,7 +205,7 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
 struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size);
 
 void uk_sched_idle_init(struct uk_sched *sched,
-		void *stack, void (*function)(void *));
+		void *stack, __sz stack_size, void (*function)(void *));
 
 static inline struct uk_thread *uk_sched_get_idle(struct uk_sched *s)
 {

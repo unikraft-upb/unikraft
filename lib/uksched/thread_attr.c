@@ -45,6 +45,7 @@ int uk_thread_attr_init(uk_thread_attr_t *attr)
 	attr->detached = false;
 	attr->prio = UK_THREAD_ATTR_PRIO_INVALID;
 	attr->timeslice = UK_THREAD_ATTR_TIMESLICE_NIL;
+	attr->stack_size = __STACK_SIZE;
 
 	return 0;
 }
@@ -132,6 +133,31 @@ int uk_thread_attr_get_timeslice(const uk_thread_attr_t *attr, __nsec *timeslice
 		return -EINVAL;
 
 	*timeslice = attr->timeslice;
+
+	return 0;
+}
+
+int uk_thread_attr_set_stack_size(uk_thread_attr_t *attr, __sz size)
+{
+	if (attr == NULL)
+		return -EINVAL;
+
+	if (size >= __STACK_SIZE)
+		return -EINVAL;
+
+	size = MAX(__PAGE_SIZE * (1 << CONFIG_MIN_STACK_SIZE_PAGE_ORDER), size);
+
+	attr->stack_size = size;
+
+	return 0;
+}
+
+int uk_thread_attr_get_stack_size(const uk_thread_attr_t *attr, __sz *size)
+{
+	if (attr == NULL || size == NULL)
+		return -EINVAL;
+
+	*size = attr->stack_size;
 
 	return 0;
 }

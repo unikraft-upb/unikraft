@@ -145,12 +145,14 @@ void uk_sched_start(struct uk_sched *sched)
 	ukplat_thread_ctx_start(&sched->plat_ctx_cbs, sched->idle->ctx);
 }
 
-static void *create_stack(struct uk_alloc *allocator)
+static void *create_stack(struct uk_alloc *allocator, __sz stack_size)
 {
 	void *stack;
 
+	UK_ASSERT(stack_size <= STACK_SIZE);
+
 	if (uk_posix_memalign(allocator, &stack,
-			      STACK_SIZE, STACK_SIZE) != 0) {
+			      STACK_SIZE, stack_size) != 0) {
 		uk_pr_err("Failed to allocate thread stack: Not enough memory\n");
 		return NULL;
 	}
@@ -172,7 +174,7 @@ static void *uk_thread_tls_create(struct uk_alloc *allocator)
 }
 
 void uk_sched_idle_init(struct uk_sched *sched,
-		void *stack, void (*function)(void *))
+		void *stack, __sz stack_size, void (*function)(void *))
 {
 	struct uk_thread *idle;
 	int rc;
@@ -184,14 +186,14 @@ void uk_sched_idle_init(struct uk_sched *sched,
 	UK_ASSERT(idle != NULL);
 
 	if (stack == NULL)
-		stack = create_stack(sched->allocator);
+		stack = create_stack(sched->allocator, stack_size);
 	UK_ASSERT(stack != NULL);
 	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
 		goto out_crash;
 
 	rc = uk_thread_init(idle,
 			&sched->plat_ctx_cbs, sched->allocator,
-			"Idle", stack, tls, function, NULL);
+			"Idle", stack, stack_size, tls, function, NULL);
 	if (rc)
 		goto out_crash;
 
@@ -211,6 +213,7 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	void *stack = NULL;
 	int rc;
 	void *tls = NULL;
+	__sz stack_size;
 
 	thread = uk_malloc(sched->allocator, sizeof(struct uk_thread));
 	if (thread == NULL) {
@@ -218,10 +221,12 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 		goto err;
 	}
 
+	stack_size = (attr) ? attr->stack_size : __STACK_SIZE;
+
 	/* We can't use lazy allocation here
 	 * since the trap handler runs on the stack
 	 */
-	stack = create_stack(sched->allocator);
+	stack = create_stack(sched->allocator, stack_size);
 	if (stack == NULL)
 		goto err;
 	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
@@ -229,7 +234,7 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 
 	rc = uk_thread_init(thread,
 			&sched->plat_ctx_cbs, sched->allocator,
-			name, stack, tls, function, arg);
+			name, stack, stack_size, tls, function, arg);
 	if (rc)
 		goto err;
 

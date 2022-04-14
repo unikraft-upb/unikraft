@@ -123,7 +123,7 @@ struct uk_thread *uk_thread_current(void)
 
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
-		const char *name, void *stack, void *tls,
+		const char *name, void *stack, __sz stack_size, void *tls,
 		void (*function)(void *), void *arg);
 void uk_thread_fini(struct uk_thread *thread,
 		struct uk_alloc *allocator);

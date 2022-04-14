@@ -59,6 +59,8 @@ typedef struct uk_thread_attr {
 	prio_t prio;
 	/* Time slice in nanoseconds */
 	__nsec timeslice;
+	/* Size of the stack */
+	__sz stack_size;
 } uk_thread_attr_t;
 
 int uk_thread_attr_init(uk_thread_attr_t *attr);
@@ -72,6 +74,9 @@ int uk_thread_attr_get_prio(const uk_thread_attr_t *attr, prio_t *prio);
 
 int uk_thread_attr_set_timeslice(uk_thread_attr_t *attr, __nsec timeslice);
 int uk_thread_attr_get_timeslice(const uk_thread_attr_t *attr, __nsec *timeslice);
+
+int uk_thread_attr_set_stack_size(uk_thread_attr_t *attr, __sz size);
+int uk_thread_attr_get_stack_size(const uk_thread_attr_t *attr, __sz *size);
 
 #ifdef __cplusplus
 }
