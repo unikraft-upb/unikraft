@@ -117,4 +117,9 @@ if LIBUKBOOT
 		bool "None"
 
 	endchoice
+
+	config LIBUKBOOT_MAIN_STACK_SIZE
+		int "Main thread stack size (kilobytes)"
+		default 64
+		depends on LIBUKSCHED
 endif

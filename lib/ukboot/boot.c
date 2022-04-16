@@ -52,6 +52,7 @@
 #endif
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
+#include <uk/thread_attr.h>
 #endif
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
@@ -192,6 +193,7 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
+	struct uk_thread_attr attr;
 #endif
 
 	uk_ctor_func_t *ctorfn;
@@ -282,7 +284,11 @@ void ukplat_entry(int argc, char *argv[])
 	tma.argv = &argv[kern_args];
 
 #if CONFIG_LIBUKSCHED
-	main_thread = uk_thread_create("main", main_thread_func, &tma);
+	uk_thread_attr_init(&attr);
+	uk_thread_attr_set_stack_size(&attr,
+		CONFIG_LIBUKBOOT_MAIN_STACK_SIZE * 1024);
+	main_thread = uk_thread_create_attr("main", &attr, main_thread_func,
+					    &tma);
 	if (unlikely(!main_thread))
 		UK_CRASH("Could not create main thread\n");
 	uk_sched_start(s);
