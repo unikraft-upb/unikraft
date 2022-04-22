@@ -53,6 +53,10 @@
 #include <vfscore/dentry.h>
 #include <vfscore/vnode.h>
 #include <uk/syscall.h>
+#include <uk/config.h>
+#ifdef CONFIG_LIBDEVFS
+#include <devfs/device.h>
+#endif /* CONFIG_LIBDEVFS */
 
 /*
  * List for VFS mount points.
@@ -95,6 +99,7 @@ fs_getfs(const char *name)
 	return NULL;
 }
 
+#ifndef CONFIG_LIBDEVFS
 int device_open(const char *name __unused, int mode __unused,
 		struct device **devp __unused)
 {
@@ -108,6 +113,7 @@ int device_close(struct device *dev)
 	UK_CRASH("%s not implemented", __func__);
 	return 0;
 }
+#endif /* !CONFIG_LIBDEVFS */
 
 UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 		const char*, fsname, unsigned long, flags, const void*, data)
