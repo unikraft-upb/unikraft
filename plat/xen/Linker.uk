@@ -18,6 +18,12 @@ XEN_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 XEN_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			 $(XEN_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
+ifeq ($(CONFIG_OPTIMIZE_LDMAP),y)
+XEN_LDMAP_FLAGS += -Wl$(comma)-M -Wl$(comma)-Map=$(XEN_IMAGE).ld.map
+else
+XEN_LDMAP_FLAGS :=
+endif
+
 $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
 	$(call build_cmd,LD,,$(XEN_IMAGE).ld.o,\
@@ -29,6 +35,7 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 			$(XEN_ALIBS) $(XEN_ALIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			-Wl$(comma)--end-group \
+			$(XEN_LDMAP_FLAGS) \
 			-o $(XEN_IMAGE).ld.o)
 	$(call build_cmd,OBJCOPY,,$(XEN_IMAGE).o,\
 		$(OBJCOPY) -w -G xenos_* -G _libxenplat_start \
