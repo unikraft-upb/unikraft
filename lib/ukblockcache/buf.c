@@ -417,10 +417,10 @@ struct ukcache_key_space *ukblockcache_create_key_space(struct ukcache *cache,
 	return ukcache_key_space_new(cache, &bufobj_key_space_ops, bo);
 }
 
+static struct ukcache *default_cache;
+
 struct ukcache *ukblockcache_get_default_cache(void)
 {
-	static struct ukcache *default_cache;
-
 	struct uk_alloc *alloc;
 	struct uk_allocpool *data_pool, *metadata_pool;
 
@@ -435,5 +435,10 @@ struct ukcache *ukblockcache_get_default_cache(void)
 		default_cache = ukcache_new(alloc, data_pool, metadata_pool);
 	}
 
+	return default_cache;
+}
+
+struct ukcache *ukblockcache_try_get_default_cache(void)
+{
 	return default_cache;
 }

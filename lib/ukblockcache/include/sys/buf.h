@@ -185,6 +185,7 @@ struct ukcache_key_space *ukblockcache_create_key_space(struct ukcache *cache,
 							struct bufobj *bo);
 
 struct ukcache *ukblockcache_get_default_cache(void);
+struct ukcache *ukblockcache_try_get_default_cache(void);
 
 #ifdef __cplusplus
 }
