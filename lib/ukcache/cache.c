@@ -1,6 +1,7 @@
 #include "ukcache/cache.h"
 
 #include "cache_priv.h"
+#include "uk/allocpool.h"
 
 #include <uk/print.h>
 
@@ -18,7 +19,7 @@ struct ukcache *ukcache_new(struct uk_alloc *alloc,
 
 	if (uk_allocpool_objlen(metadata_alloc)
 	    != UKCACHE_METADATA_ENTRY_SIZE) {
-		uk_pr_err("metadatadata pool allocator must allocate metadata-sized entries\n");
+		uk_pr_err("metadata pool allocator must allocate metadata-sized entries\n");
 		return NULL;
 	}
 
@@ -233,4 +234,32 @@ struct ukcache_node *ukcache_get(struct ukcache_key_space *key_space,
 	uk_list_add(&node->nodes_head, &key_space->nodes_list);
 
 	return node;
+}
+
+__sz ukcache_reserved_memory(struct ukcache *cache)
+{
+	__sz reserved;
+
+	reserved = (__sz)uk_allocpool_maxcount(cache->metadata_alloc) *
+		uk_allocpool_objlen(cache->metadata_alloc);
+
+	reserved += (__sz)uk_allocpool_maxcount(cache->data_alloc) *
+		uk_allocpool_objlen(cache->data_alloc);
+
+	return reserved;
+}
+
+__sz ukcache_used_memory(struct ukcache *cache)
+{
+	__sz reserved = ukcache_reserved_memory(cache);
+	__sz free;
+
+	free = (__sz)uk_allocpool_availcount(cache->metadata_alloc) *
+		uk_allocpool_objlen(cache->metadata_alloc);
+
+	free += (__sz)uk_allocpool_availcount(cache->data_alloc) *
+		uk_allocpool_objlen(cache->data_alloc);
+
+	UK_ASSERT(reserved >= free);
+	return reserved - free;
 }

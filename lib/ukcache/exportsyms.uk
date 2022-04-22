@@ -4,4 +4,5 @@ ukcache_key_space_new
 ukcache_key_space_free
 ukcache_get
 ukcache_node_rel
-
+ukcache_reserved_memory
+ukcache_used_memory

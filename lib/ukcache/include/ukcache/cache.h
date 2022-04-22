@@ -99,6 +99,9 @@ struct ukcache_node *ukcache_get(struct ukcache_key_space *key_space,
 
 void ukcache_node_rel(struct ukcache_node *node);
 
+__sz ukcache_reserved_memory(struct ukcache *cache);
+__sz ukcache_used_memory(struct ukcache *cache);
+
 #ifdef __cplusplus
 }
 #endif
