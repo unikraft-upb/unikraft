@@ -376,7 +376,7 @@ int raise(int sig)
  * If all of the threads have the signal blocked, add it to process
  * pending signals
  */
-int kill(pid_t pid, int sig)
+UK_SYSCALL_R_DEFINE(int, kill, pid_t, pid, int, sig)
 {
 	/*
 	 * POSIX.1 requires that if a process sends a signal to itself, and the
@@ -394,13 +394,11 @@ int kill(pid_t pid, int sig)
 
 
 	if (pid != 1 && pid != 0 && pid != -1) {
-		errno = ESRCH;
-		return -1;
+		return -ESRCH;
 	}
 
 	if (!uk_sig_is_valid(sig)) {
-		errno = EINVAL;
-		return -1;
+		return -EINVAL;
 	}
 
 	/* setup siginfo */
