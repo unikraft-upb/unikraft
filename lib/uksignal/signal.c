@@ -181,10 +181,21 @@ int sigpending(sigset_t *set)
 	return 0;
 }
 
-int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+UK_SYSCALL_R_DEFINE(int, rt_sigprocmask,
+		    int, how,
+		    const sigset_t *, set,
+		    sigset_t *, oldset,
+		    size_t, sigsetsize)
 {
 	return uk_thread_sigmask(how, set, oldset);
 }
+
+#if UK_LIBC_SYSCALLS
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+	return rt_sigprocmask(how, set, oldset, (_NSIG / 8));
+}
+#endif /* UK_LIBC_SYSCALLS */
 
 int sigsuspend(const sigset_t *mask)
 {
