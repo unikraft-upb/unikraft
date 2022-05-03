@@ -96,13 +96,17 @@ static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
 
 UK_TRACEPOINT(trace_vq_intr, "%p %d", void *, int);
 UK_TRACEPOINT(trace_vq_intr_ret, "%p %d", void *, int);
+UK_TRACEPOINT(trace_vq_intr_en, "%p", void *);
+UK_TRACEPOINT(trace_vq_intr_en_fin, "%p %d", void *, __u8);
+UK_TRACEPOINT(trace_vq_intr_dis, "%p", void *);
 
+#ifdef VIRTIO_RING_TRACE_QUEUE
 UK_TRACEPOINT(trace_vr_enqueue, "%p %u->%u %u %p %u", void *, __u16, __u16,
 	      unsigned, __paddr_t, unsigned);
 UK_TRACEPOINT(trace_vr_dequeue, "%p %u->%u %p %u", void *, __u16, __u16,
 		__paddr_t, unsigned);
 UK_TRACEPOINT(trace_vr_set_head, "%p from=%u to=%u", void *, __u16, __u16);
-UK_TRACEPOINT(trace_vr_avail, "%p %u", void *, __u16);
+#endif /* VIRTIO_RING_TRACE_QUEUE */
 
 /**
  * Driver implementation
@@ -115,6 +119,8 @@ void virtqueue_intr_disable(struct virtqueue *vq)
 
 	vrq = to_virtqueue_vring(vq);
 	vrq->vring.avail->flags |= (VRING_AVAIL_F_NO_INTERRUPT);
+
+	trace_vq_intr_dis(vq);
 }
 
 int virtqueue_intr_enable(struct virtqueue *vq)
@@ -123,6 +129,8 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 	int rc = 0;
 
 	UK_ASSERT(vq);
+
+	trace_vq_intr_en(vq);
 
 	vrq = to_virtqueue_vring(vq);
 	/* Check if there are no more packets enabled */
@@ -154,6 +162,9 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 		 */
 		rc = 1;
 	}
+
+	trace_vq_intr_en_fin(vq, rc);
+
 	return rc;
 }
 
@@ -196,7 +207,9 @@ static __u16 virtqueue_desc_alloc(struct virtqueue_vring *vqr, __u16 n)
 	} while (ukarch_compare_exchange_sync(&vqr->free_list._atomic,
 			old._atomic, new._atomic) != new._atomic);
 
+#ifdef VIRTIO_RING_TRACE_QUEUE
 	trace_vr_set_head(vqr, old.head, new.head);
+#endif /* VIRTIO_RING_TRACE_QUEUE */
 
 	return old.head;
 }
@@ -214,7 +227,9 @@ static __u16 virtqueue_desc_free(struct virtqueue_vring *vqr, __u16 idx)
 
 	/* Walk provided list to find its last descriptor */
 	while (1) {
+#ifdef VIRTIO_RING_TRACE_QUEUE
 		trace_vr_dequeue(vqr, idx, desc->next, desc->addr, desc->len);
+#endif /* VIRTIO_RING_TRACE_QUEUE */
 		desc->addr = 0x0;
 		desc->len = 0x0;
 		idx = desc->next;
@@ -241,7 +256,9 @@ static __u16 virtqueue_desc_free(struct virtqueue_vring *vqr, __u16 idx)
 	} while (ukarch_compare_exchange_sync(&vqr->free_list._atomic,
 			old._atomic, new._atomic) != new._atomic);
 
+#ifdef VIRTIO_RING_TRACE_QUEUE
 	trace_vr_set_head(vqr, old.head, new.head);
+#endif /* VIRTIO_RING_TRACE_QUEUE */
 
 	return new.len;
 }
@@ -280,9 +297,11 @@ static inline void virtqueue_buffer_enqueue_segments(
 		if (i < total_desc - 1)
 			vrq->vring.desc[idx].flags |= VRING_DESC_F_NEXT;
 
+#ifdef VIRTIO_RING_TRACE_QUEUE
 		trace_vr_enqueue(&vrq->vq, idx, vrq->vring.desc[idx].next,
 				 vrq->vring.desc[idx].flags,
 				 segs->ss_paddr, segs->ss_len);
+#endif /* VIRTIO_RING_TRACE_QUEUE */
 
 		idx = vrq->vring.desc[idx].next;
 	}
