@@ -75,6 +75,7 @@ static void _convert_mbinfo(struct multiboot_info *mi)
 	/*
 	 * Look for the first chunk of memory at PLATFORM_MEM_START.
 	 */
+	bootinfo.max_addr = 0;
 	uk_pr_debug("Multiboot memory regions:\n");
 	for (offset = 0; offset < mi->mmap_length;
 	     offset += m->size + sizeof(m->size)) {
@@ -86,18 +87,23 @@ static void _convert_mbinfo(struct multiboot_info *mi)
 		if ((m->addr + m->len) > physmem_max_addr)
 			physmem_max_addr = m->addr + m->len;
 
-		if (m->type == MULTIBOOT_MEMORY_AVAILABLE)
+		if (m->type == MULTIBOOT_MEMORY_AVAILABLE) {
 			physmem_total += m->len;
+
+			if (m->addr == PLATFORM_MEM_START) {
+				UK_ASSERT(bootinfo.max_addr == 0);
+				bootinfo.max_addr = m->addr + m->len;
+			}
+		}
 	}
 
-#ifndef CONFIG_PAGING
 	/*
 	 * Cap our memory size to PLATFORM_MAX_MEM_SIZE for which the initial
 	 * static page table defines mappings for. Don't apply the limit when
 	 * paging is enabled as we take the information about the heap regions
 	 * to initialize the frame allocator.
 	 */
-	bootinfo.max_addr = m->addr + m->len;
+#ifndef CONFIG_PAGING
 	if (bootinfo.max_addr > PLATFORM_MAX_MEM_ADDR)
 		bootinfo.max_addr = PLATFORM_MAX_MEM_ADDR;
 #endif /* !CONFIG_PAGING */
@@ -106,8 +112,8 @@ static void _convert_mbinfo(struct multiboot_info *mi)
 	/*
 	 * Reserve space for boot stack at the end of found memory
 	 */
-	if ((bootinfo.max_addr - m->addr) < __STACK_SIZE)
-		UK_CRASH("Not enough memory to allocate boot stack\n");
+	//if ((bootinfo.max_addr - m->addr) < __STACK_SIZE)
+	//	UK_CRASH("Not enough memory to allocate boot stack\n");
 
 	/*
 	 * Search for initrd (called boot module according to multiboot)
