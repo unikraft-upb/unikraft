@@ -259,6 +259,7 @@ static inline
 void uk_sched_thread_switch(struct uk_sched *sched,
 		struct uk_thread *prev, struct uk_thread *next)
 {
+	__uk_sched_thread_current = next;
 	ukplat_thread_ctx_switch(&sched->plat_ctx_cbs, prev->ctx, next->ctx);
 }
 
