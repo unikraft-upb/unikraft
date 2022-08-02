@@ -10,6 +10,11 @@ config UKPLAT_LCPU_MAXCOUNT
 	range 1 256
 	default 1
 
+config UKPLAT_SAVERESTORE_GSBASE
+	bool "Save/Restore GS on Context Switch"
+	depends on ARCH_X86_64
+	default n
+
 config HAVE_SMP
 	bool
 	default y if UKPLAT_LCPU_MAXCOUNT > 1

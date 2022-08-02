@@ -37,6 +37,7 @@
 #include <uk/assert.h>
 #include <uk/alloc.h>
 #include <string.h>
+#include <uk/config.h>
 
 void halt(void);
 void system_off(void);
@@ -68,6 +69,11 @@ static inline void cpuid(__u32 fn, __u32 subfn,
 		     : "a"(fn), "c" (subfn));
 }
 
+#ifdef CONFIG_UKPLAT_SAVERESTORE_GSBASE
+#define _EXTREGS_GS_BASE(ctx)				\
+	((ctx)->extregs + x86_cpu_features.extregs_size - 8)
+#endif /* CONFIG_UKPLAT_SAVERESTORE_GSBASE */
+
 static inline void save_extregs(struct sw_ctx *ctx)
 {
 	switch (x86_cpu_features.save) {
@@ -89,6 +95,12 @@ static inline void save_extregs(struct sw_ctx *ctx)
 				"a"(0xffffffff), "d"(0xffffffff) : "memory");
 		break;
 	}
+#ifdef CONFIG_UKPLAT_SAVERESTORE_GSBASE
+	asm volatile(
+		"rdgsbase	%%rax\n\r"
+		"movq		%%rax, (%0)"
+		:: "r"(_EXTREGS_GS_BASE(ctx)) : "rax", "memory");
+#endif /* CONFIG_UKPLAT_SAVERESTORE_GSBASE */
 }
 static inline void restore_extregs(struct sw_ctx *ctx)
 {
@@ -108,6 +120,12 @@ static inline void restore_extregs(struct sw_ctx *ctx)
 				"a"(0xffffffff), "d"(0xffffffff));
 		break;
 	}
+#ifdef CONFIG_UKPLAT_SAVERESTORE_GSBASE
+	asm volatile(
+		"movq		(%0), %%rax\n\r"
+		"wrgsbase	%%rax"
+		:: "r"(_EXTREGS_GS_BASE(ctx)) : "rax");
+#endif /* CONFIG_UKPLAT_SAVERESTORE_GSBASE */
 }
 
 static inline __sz arch_extregs_size(void)
@@ -155,6 +173,9 @@ static inline void _init_cpufeatures(void)
 		x86_cpu_features.extregs_size = 108;
 		x86_cpu_features.extregs_align = 1;
 	}
+#ifdef CONFIG_UKPLAT_SAVERESTORE_GSBASE
+	x86_cpu_features.extregs_size += 8;
+#endif /* CONFIG_UKPLAT_SAVERESTORE_GSBASE */
 }
 
 unsigned long read_cr2(void);
