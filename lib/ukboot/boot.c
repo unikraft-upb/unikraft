@@ -141,7 +141,7 @@ static void main_thread_func(void *arg)
 			continue;
 
 		uk_pr_debug("Call constructor: %p()...\n", *ctorfn);
-		(*ctorfn)();
+		(*ctorfn)(tma->argc, tma->argv);
 	}
 
 	uk_pr_info("Calling main(%d, [", tma->argc);
