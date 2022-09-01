@@ -76,8 +76,14 @@ static void schedcoop_schedule(struct uk_sched *s)
 		 * find the time when the next timeout expires, else use
 		 * 10 seconds.
 		 */
-		__snsec now = ukplat_monotonic_clock();
-		__snsec min_wakeup_time = now + ukarch_time_sec_to_nsec(10);
+		int has_time = 0;
+		__snsec now;
+		__snsec min_wakeup_time;
+		if (!UK_TAILQ_EMPTY(&prv->sleeping_threads)) {
+			has_time = 1;
+			now = ukplat_monotonic_clock();
+			min_wakeup_time = now + ukarch_time_sec_to_nsec(10);
+		}
 
 		/* wake some sleeping threads */
 		UK_TAILQ_FOREACH_SAFE(thread, &prv->sleeping_threads,
@@ -109,6 +115,11 @@ static void schedcoop_schedule(struct uk_sched *s)
 		} else if (is_runnable(prev)) {
 			next = prev;
 			break;
+		}
+
+		if (!has_time) {
+			now = ukplat_monotonic_clock();
+			min_wakeup_time = now + ukarch_time_sec_to_nsec(10);
 		}
 
 		/* block until the next timeout expires, or for 10 secs,
