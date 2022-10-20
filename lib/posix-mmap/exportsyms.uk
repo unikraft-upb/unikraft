@@ -1,4 +1,5 @@
 mmap
+mmap64
 uk_syscall_e_mmap
 uk_syscall_r_mmap
 munmap

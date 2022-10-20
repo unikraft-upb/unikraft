@@ -329,6 +329,7 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot, int, flags,
 
 	return (void *) vaddr;
 }
+__alias(mmap, mmap64);
 
 UK_SYSCALL_R_DEFINE(int, munmap, void*, addr, size_t, len)
 {
