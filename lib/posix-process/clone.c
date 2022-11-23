@@ -332,7 +332,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	/* Parent must have ECTX and a Unikraft TLS */
 	UK_ASSERT((t->flags & UK_THREADF_ECTX)
 		  && (t->flags & UK_THREADF_UKTLS));
-	UK_ASSERT(uk_syscall_return_addr());
+	UK_ASSERT(return_addr);
 
 	if (!cl_args || cl_args_len < CL_ARGS_REQUIRED_LEN) {
 		uk_pr_debug("No or invalid clone arguments given\n");
