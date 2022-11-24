@@ -114,7 +114,17 @@ static inline __uptr uk_syscall_ultlsp(void)
 		return ultlsp;
 	return 0x0;
 }
-#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+#else /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
+/**
+ * If we do not support binary system calls and userland TLS pointers, we do not
+ * know any caller TLS pointer, so we can always return 0.
+ */
+static inline __uptr uk_syscall_ultlsp(void)
+{
+	return 0x0;
+}
+#endif /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
