@@ -70,6 +70,7 @@ void ukplat_syscall_handler(struct __regs *r)
 	_uk_syscall_ultlsp = orig_tlsp;
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
+	/* uk_syscall6_r() will clear _uk_syscall_return_addr on return */
 	_uk_syscall_return_addr = r->rip;
 
 #if CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER
@@ -82,19 +83,17 @@ void ukplat_syscall_handler(struct __regs *r)
 				 r->rarg0, r->rarg1, r->rarg2,
 				 r->rarg3, r->rarg4, r->rarg5);
 
-#if !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	_uk_syscall_return_addr = 0x0;
-#else /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
-	uk_thread_uktls_var(self, _uk_syscall_return_addr) = 0x0;
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	uk_thread_uktls_var(self, _uk_syscall_ultlsp) = 0x0;
 
 	/* Restore original TLS only if it was _NOT_
-	 * changed by the system call handler */
+	 * changed by the system call handler
+	 */
 	if (likely(ukplat_tlsp_get() == self->uktlsp)) {
 		ukplat_tlsp_set(orig_tlsp);
 	} else {
 		uk_pr_debug("System call updated userland TLS pointer register to %p (before: %p)\n",
-			    orig_tlsp, ukplat_tlsp_get());
+			    (void *) orig_tlsp, (void *) ukplat_tlsp_get());
 	}
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
