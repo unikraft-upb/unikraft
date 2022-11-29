@@ -177,6 +177,7 @@ int pclose(FILE *stream __unused)
 	return -1;
 }
 
+#if UK_LIBC_SYSCALLS
 int wait(int *status __unused)
 {
 	/* No children */
@@ -191,7 +192,6 @@ pid_t waitpid(pid_t pid __unused, int *wstatus __unused, int options __unused)
 	return -1;
 }
 
-#if UK_LIBC_SYSCALLS
 pid_t wait3(int *wstatus __unused, int options __unused,
 		struct rusage *rusage __unused)
 {
