@@ -325,7 +325,7 @@ RUSTCFLAGS-y :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
 DMDFLAGS :=
-DMDFLAGS-y :=
+DMDFLAGS-y := -target=x86_64-unknown-openbsd-musl
 DMDINCLUDES :=
 DMDINCLUDES-y :=
 GDCFLAGS :=
@@ -354,6 +354,11 @@ $(call verbose_info,Including $(UK_CONFIG)...)
 -include $(UK_CONFIG)
 UK_HAVE_DOT_CONFIG := y
 endif
+endif
+
+ifneq ($(CONFIG_HAVE_DRUNTIME), y)
+GDCFLAGS-y := -fno-druntime
+DMDFLAGS-y := -betterC
 endif
 
 # parameter N: UK_NAME ###
