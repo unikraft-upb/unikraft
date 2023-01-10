@@ -325,7 +325,7 @@ RUSTCFLAGS-y :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
 DMDFLAGS :=
-DMDFLAGS-y :=
+DMDFLAGS-y := -betterC -target=x86_64-unknown-openbsd-musl
 DMDINCLUDES :=
 DMDINCLUDES-y :=
 GDCFLAGS :=
