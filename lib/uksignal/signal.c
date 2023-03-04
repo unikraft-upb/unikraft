@@ -56,7 +56,7 @@ UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 		return -EINVAL;
 
 	if (oldact)
-		*oldact = (struct sigaction){0};
+		/**oldact = (struct sigaction){0};*/
 
 	return 0;
 }
