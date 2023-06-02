@@ -74,6 +74,8 @@
 #define BFA_Lx_ALIGN_UP(addr, lvl)	ALIGN_UP(addr, BFA_Lx_SIZE(lvl))
 #define BFA_Lx_ALIGN_DOWN(addr, lvl)	ALIGN_DOWN(addr, BFA_Lx_SIZE(lvl))
 
+UK_LIST_HEAD(uk_falloc_head);
+
 static inline unsigned int bfa_order_to_lvl(unsigned int order)
 {
 	UK_ASSERT(order >= PAGE_SHIFT);
@@ -1473,6 +1475,7 @@ static int bfa_addmem(struct uk_falloc *fa, void *metadata, __paddr_t paddr,
 
 int uk_fallocbuddy_init(struct uk_falloc *fa)
 {
+	int res = 0;
 	struct buddy_framealloc *bfa = (struct buddy_framealloc *)fa;
 	unsigned int i;
 
@@ -1491,7 +1494,13 @@ int uk_fallocbuddy_init(struct uk_falloc *fa)
 
 	bfa->zones = __NULL;
 
-	return 0;
+	uk_list_add(&fa->list_head, &uk_falloc_head);
+
+#ifdef CONFIG_LIBUKFALLOC_STATS
+	res = uk_falloc_init_stats(fa);
+#endif /* CONFIG_LIBUKFALLOC_STATS */
+
+	return res;
 }
 
 __sz uk_fallocbuddy_size(void)
