@@ -25,6 +25,24 @@ static unsigned int falloc_id;
 
 static struct uk_store_event_data event_data;
 
+static int get_free_memory_global(void *cookie __unused, __u64 *out)
+{
+	*out = uk_falloc_stats_global.free_memory;
+
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(UK_FALLOC_STATS_FREE_MEMORY, free_memory_global, u64,
+		      get_free_memory_global, NULL);
+
+static int get_total_memory_global(void *cookie __unused, __u64 *out)
+{
+	*out = uk_falloc_stats_global.total_memory;
+
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(UK_FALLOC_STATS_TOTAL_MEMORY, total_memory_global, u64,
+		      get_total_memory_global, NULL);
+
 static int get_free_memory(void *cookie, __u64 *out)
 {
 	struct uk_falloc *fa = (struct uk_falloc *)cookie;

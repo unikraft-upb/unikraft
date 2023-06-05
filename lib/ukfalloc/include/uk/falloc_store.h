@@ -6,8 +6,16 @@
 #ifndef __UK_FALLOC_STORE_H__
 #define __UK_FALLOC_STORE_H__
 
+/* stats object entry IDs */
 #define UK_FALLOC_STATS_FREE_MEMORY	0x01
 #define UK_FALLOC_STATS_TOTAL_MEMORY	0x02
+
+struct uk_falloc_stats_global {
+	__sz free_memory;
+	__sz total_memory;
+};
+
+extern struct uk_falloc_stats_global uk_falloc_stats_global;
 
 /* Initialize stats for a new uk_falloc instance
  *
